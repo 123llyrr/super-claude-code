@@ -4,6 +4,10 @@
 
 > 原始泄露源码无法直接运行。本仓库修复了启动链路中的多个阻塞问题，使完整的 Ink TUI 交互界面可以在本地工作。
 
+<p align="center">
+  <img src="docs/00runtime.png" alt="运行截图" width="800">
+</p>
+
 ## 功能
 
 - 完整的 Ink TUI 交互界面（与官方 Claude Code 一致）
@@ -11,6 +15,25 @@
 - 支持 MCP 服务器、插件、Skills
 - 支持自定义 API 端点和模型
 - 降级 Recovery CLI 模式
+
+---
+
+## 架构概览
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/01-overall-architecture.png" alt="整体架构"><br><b>整体架构</b></td>
+    <td align="center" width="25%"><img src="docs/02-request-lifecycle.png" alt="请求生命周期"><br><b>请求生命周期</b></td>
+    <td align="center" width="25%"><img src="docs/03-tool-system.png" alt="工具系统"><br><b>工具系统</b></td>
+    <td align="center" width="25%"><img src="docs/04-multi-agent.png" alt="多 Agent 架构"><br><b>多 Agent 架构</b></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="docs/05-terminal-ui.png" alt="终端 UI"><br><b>终端 UI</b></td>
+    <td align="center" width="25%"><img src="docs/06-permission-security.png" alt="权限与安全"><br><b>权限与安全</b></td>
+    <td align="center" width="25%"><img src="docs/07-services-layer.png" alt="服务层"><br><b>服务层</b></td>
+    <td align="center" width="25%"><img src="docs/08-state-data-flow.png" alt="状态与数据流"><br><b>状态与数据流</b></td>
+  </tr>
+</table>
 
 ---
 
