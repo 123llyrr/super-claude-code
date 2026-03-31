@@ -49,6 +49,10 @@ export function resetSyncCache(): void {
 export function isRemoteManagedSettingsEligible(): boolean {
   if (cached !== undefined) return cached
 
+  if (process.env.CLAUDE_CODE_LOCAL_SKIP_REMOTE_PREFETCH === '1') {
+    return (cached = setEligibility(false))
+  }
+
   // 3p provider users should not hit the settings endpoint
   if (getAPIProvider() !== 'firstParty') {
     return (cached = setEligibility(false))

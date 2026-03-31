@@ -165,6 +165,10 @@ function computeChecksum(
  * getSettings() to avoid circular dependencies during settings loading.
  */
 export function isPolicyLimitsEligible(): boolean {
+  if (process.env.CLAUDE_CODE_LOCAL_SKIP_REMOTE_PREFETCH === '1') {
+    return false
+  }
+
   // 3p provider users should not hit the policy limits endpoint
   if (getAPIProvider() !== 'firstParty') {
     return false

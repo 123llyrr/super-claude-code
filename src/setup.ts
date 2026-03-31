@@ -159,6 +159,16 @@ export async function setup(
 
   // IMPORTANT: setCwd() must be called before any other code that depends on the cwd
   setCwd(cwd)
+  setOriginalCwd(cwd)
+  setProjectRoot(cwd)
+
+  // Local recovery mode: when CLAUDE_CODE_LOCAL_RECOVERY=1 is explicitly set,
+  // trim startup to minimum. Otherwise run full setup for the Ink TUI.
+  if (process.env.CLAUDE_CODE_LOCAL_RECOVERY === '1') {
+    process.stderr.write('[local-recovery] setup early return\n')
+    profileCheckpoint('setup_local_recovery_early_return')
+    return
+  }
 
   // Capture hooks configuration snapshot to avoid hidden hook modifications.
   // IMPORTANT: Must be called AFTER setCwd() so hooks are loaded from the correct directory
