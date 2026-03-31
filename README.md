@@ -1,17 +1,28 @@
-# Claude Code — Source Analysis
+# Claude Code — Leaked Source (2026-03-31)
 
-> An archive of [Anthropic](https://www.anthropic.com)'s official CLI tool **Claude Code** source code, for analysis and educational purposes.
+> **On March 31, 2026, the full source code of Anthropic's Claude Code CLI was leaked** via a `.map` file exposed in their npm registry.
+
+---
+
+## How It Leaked
+
+[Chaofan Shou (@Fried_rice)](https://x.com/Fried_rice) discovered the leak and posted it publicly:
+
+> **"Claude code source code has been leaked via a map file in their npm registry!"**
 >
-> Reference: [Original tweet](https://x.com/Fried_rice/status/2038894956459290963)
+> — [@Fried_rice, March 31, 2026](https://x.com/Fried_rice/status/2038894956459290963)
+
+The source map file in the published npm package contained a reference to the full, unobfuscated TypeScript source, which was downloadable as a zip archive from Anthropic's R2 storage bucket.
 
 ---
 
 ## Overview
 
-Claude Code is a CLI tool that lets you interact with Claude directly from the terminal to perform software engineering tasks — editing files, running commands, searching codebases, managing git workflows, and more.
+Claude Code is Anthropic's official CLI tool that lets you interact with Claude directly from the terminal to perform software engineering tasks — editing files, running commands, searching codebases, managing git workflows, and more.
 
-This repository contains the `src/` directory extracted for study.
+This repository contains the leaked `src/` directory.
 
+- **Leaked on**: 2026-03-31
 - **Language**: TypeScript
 - **Runtime**: Bun
 - **Terminal UI**: React + [Ink](https://github.com/vadimdemedes/ink) (React for CLI)
@@ -241,6 +252,6 @@ Built-in and third-party plugins are loaded through the `plugins/` subsystem.
 
 ---
 
-## License
+## Disclaimer
 
-This repository is for analysis and educational purposes only. All original source code is copyrighted by [Anthropic](https://www.anthropic.com).
+This repository archives source code that was leaked from Anthropic's npm registry on **2026-03-31**. All original source code is the property of [Anthropic](https://www.anthropic.com).
