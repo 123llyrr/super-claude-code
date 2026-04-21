@@ -9,6 +9,7 @@ import { shouldAllowManagedHooksOnly } from './hooks/hooksConfigSnapshot.js'
 import { executeSessionStartHooks, executeSetupHooks } from './hooks.js'
 import { logError } from './log.js'
 import { loadPluginHooks } from './plugins/loadPluginHooks.js'
+import { loadSoulMemory } from './soulMemory.js'
 
 type SessionStartHooksOptions = {
   sessionId?: string
@@ -170,6 +171,10 @@ export async function processSessionStartHooks(
     })
     hookMessages.push(contextMessage)
   }
+
+  // Load soul memory directly (不依赖hook系统)
+  const soulMemoryMessages = await loadSoulMemory()
+  hookMessages.push(...soulMemoryMessages)
 
   return hookMessages
 }
