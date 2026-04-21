@@ -206,22 +206,51 @@ CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/super-claude-code
 
 ```
 bin/super-claude-code          # 入口脚本
-preload.ts               # Bun preload（设置 MACRO 全局变量）
-.env.example             # 环境变量模板
+preload.ts                     # Bun preload（设置 MACRO 全局变量）
+.env.example                   # 环境变量模板
+stubs/                         # 类型桩文件（补全缺失的类型）
+deps/                          # 外部依赖源码
 src/
-├── entrypoints/cli.tsx  # CLI 主入口
-├── main.tsx             # TUI 主逻辑（Commander.js + React/Ink）
-├── localRecoveryCli.ts  # 降级 Recovery CLI
-├── setup.ts             # 启动初始化
-├── screens/REPL.tsx     # 交互 REPL 界面
-├── ink/                 # Ink 终端渲染引擎
-├── components/          # UI 组件
-├── tools/               # Agent 工具（Bash, Edit, Grep 等）
-├── commands/            # 斜杠命令（/commit, /review 等）
-├── skills/              # Skill 系统
-├── services/            # 服务层（API, MCP, OAuth 等）
-├── hooks/               # React hooks
-└── utils/               # 工具函数
+├── entrypoints/               # 入口点
+│   ├── cli.tsx               # CLI 主入口
+│   ├── init.ts               # 初始化
+│   └── mcp.ts                # MCP 入口
+├── main.tsx                   # TUI 主逻辑
+├── localRecoveryCli.ts        # 降级 Recovery CLI
+├── setup.ts                   # 启动初始化
+├── commands.ts                # 斜杠命令主入口
+├── components/                # UI 组件（Ink/React）
+├── screens/                   # 界面屏幕
+│   ├── REPL.tsx              # 交互 REPL 界面
+│   └── Doctor.tsx            # 诊断界面
+├── ink/                       # Ink 终端渲染引擎
+├── hooks/                     # React hooks
+├── services/                   # 服务层（MCP, API, 诊断等）
+├── skills/                     # Skill 系统
+├── tools/                      # Agent 工具（Bash, Edit, Grep 等）
+├── utils/                       # 工具函数
+├── bridge/                      # Bridge 通信层
+├── state/                       # 状态管理
+├── memdir/                      # 记忆系统
+├── voice/                       # 语音模块
+├── vim/                         # Vim 模拟
+├── keybindings/                 # 快捷键
+├── migrations/                  # 数据迁移
+├── server/                       # 服务器
+├── remote/                       # 远程会话
+├── plugins/                      # 插件系统
+├── outputStyles/                 # 输出样式
+├── query/                        # 查询引擎
+├── tasks/                        # 任务系统
+├── coordinator/                  # 协调器
+├── buddy/                        # 伙伴系统
+├── assistant/                    # Assistant 模块
+├── bootstrap/                    # 引导模块
+├── context/                      # 上下文
+├── types/                        # 类型定义
+├── constants/                    # 常量定义
+├── schemas/                      # Schema 定义
+└── upstreamproxy/               # 上游代理
 ```
 
 ---

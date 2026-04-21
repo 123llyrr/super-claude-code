@@ -206,22 +206,51 @@ The leaked source could not run directly. This repository mainly fixes the follo
 
 ```text
 bin/super-claude-code          # Entry script
-preload.ts               # Bun preload (sets MACRO globals)
-.env.example             # Environment variable template
+preload.ts                     # Bun preload (sets MACRO globals)
+.env.example                   # Environment variable template
+stubs/                         # Type stubs (for missing types)
+deps/                          # External dependency sources
 src/
-├── entrypoints/cli.tsx  # Main CLI entry
-├── main.tsx             # Main TUI logic (Commander.js + React/Ink)
-├── localRecoveryCli.ts  # Fallback Recovery CLI
-├── setup.ts             # Startup initialization
-├── screens/REPL.tsx     # Interactive REPL screen
-├── ink/                 # Ink terminal rendering engine
-├── components/          # UI components
-├── tools/               # Agent tools (Bash, Edit, Grep, etc.)
-├── commands/            # Slash commands (/commit, /review, etc.)
-├── skills/              # Skill system
-├── services/            # Service layer (API, MCP, OAuth, etc.)
-├── hooks/               # React hooks
-└── utils/               # Utility functions
+├── entrypoints/               # Entrypoints
+│   ├── cli.tsx               # Main CLI entry
+│   ├── init.ts               # Initialization
+│   └── mcp.ts                # MCP entry
+├── main.tsx                   # Main TUI logic
+├── localRecoveryCli.ts        # Fallback Recovery CLI
+├── setup.ts                   # Startup initialization
+├── commands.ts                # Slash commands main entry
+├── components/                # UI components (Ink/React)
+├── screens/                   # Screen views
+│   ├── REPL.tsx             # Interactive REPL screen
+│   └── Doctor.tsx           # Diagnostic screen
+├── ink/                       # Ink terminal rendering engine
+├── hooks/                     # React hooks
+├── services/                   # Service layer (MCP, API, diagnostics)
+├── skills/                     # Skill system
+├── tools/                      # Agent tools (Bash, Edit, Grep, etc.)
+├── utils/                       # Utility functions
+├── bridge/                      # Bridge communication layer
+├── state/                       # State management
+├── memdir/                      # Memory system
+├── voice/                       # Voice module
+├── vim/                         # Vim emulation
+├── keybindings/                 # Keybindings
+├── migrations/                  # Data migrations
+├── server/                       # Server
+├── remote/                       # Remote sessions
+├── plugins/                      # Plugin system
+├── outputStyles/                 # Output styles
+├── query/                        # Query engine
+├── tasks/                        # Task system
+├── coordinator/                  # Coordinator
+├── buddy/                        # Buddy system
+├── assistant/                    # Assistant module
+├── bootstrap/                    # Bootstrap module
+├── context/                      # Context
+├── types/                        # Type definitions
+├── constants/                    # Constants
+├── schemas/                      # Schemas
+└── upstreamproxy/               # Upstream proxy
 ```
 
 ---
