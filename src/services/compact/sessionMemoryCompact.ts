@@ -40,6 +40,27 @@ import {
 } from './compact.js'
 import { estimateMessageTokens } from './microCompact.js'
 import { getCompactUserSummaryMessage } from './prompt.js'
+import { compressMemories, shouldCompress } from '../../memdir/memoryCompressor.js'
+import { MEMORY_TYPES } from '../../memdir/memoryTypes.js'
+import { getAutoMemPath } from '../../memdir/paths.js'
+
+/**
+ * 尝试压缩记忆（异步，不阻塞主流程）
+ */
+async function tryCompressMemoriesIfNeeded(): Promise<void> {
+  const memoryDir = getAutoMemPath()
+  if (!memoryDir) return
+
+  for (const type of MEMORY_TYPES) {
+    try {
+      if (await shouldCompress(memoryDir, type, 5)) {
+        await compressMemories(memoryDir, type)
+      }
+    } catch {
+      // 压缩失败不阻塞
+    }
+  }
+}
 
 /**
  * Configuration for session memory compaction thresholds
@@ -612,6 +633,9 @@ export async function trySessionMemoryCompaction(
       })
       return null
     }
+
+    // 触发记忆压缩（不等待）
+    tryCompressMemoriesIfNeeded()
 
     return {
       ...compactionResult,
