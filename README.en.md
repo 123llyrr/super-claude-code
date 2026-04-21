@@ -1,4 +1,4 @@
-# Claude Code Haha
+# Super Claude Code
 
 <p align="right"><a href="./README.md">中文</a> | <strong>English</strong></p>
 
@@ -6,9 +6,28 @@ A **locally runnable version** repaired from the leaked Claude Code source, with
 
 > The original leaked source does not run as-is. This repository fixes multiple blocking issues in the startup path so the full Ink TUI can work locally.
 
-<p align="center">
-  <img src="docs/00runtime.png" alt="Runtime screenshot" width="800">
-</p>
+
+## Key Features
+
+### 🧠 Memory System
+Cross-session persistent memory. AI automatically extracts and stores project facts, user preferences, and coding conventions. Context is available on demand without repeated explanations.
+
+### 💫 Soul System
+The "soul" of your AI — role definition, behavioral guidelines, and communication style persist across sessions. Define your专属 AI partner instead of re-tuning it every time.
+
+### 🖥️ Linux Computer Use
+Execute **Computer Use** tasks on Linux environments:
+- Screen and region screenshot capture
+- Mouse and keyboard automation
+- Wayland/X11 input event injection
+- Native Linux input loader (no macOS accessibility API dependency)
+
+### ⚡ Performance Optimization
+- **Hot loading**: Code changes take effect in seconds, no restart needed
+- **Memory compression**: Auto-merges similar memories, keeps memory lean
+- **Context trimming**: Intelligent compression of historical messages, reduces token consumption
+
+---
 
 ## Features
 
@@ -20,24 +39,6 @@ A **locally runnable version** repaired from the leaked Claude Code source, with
 
 ---
 
-## Architecture Overview
-
-<table>
-  <tr>
-    <td align="center" width="25%"><img src="docs/01-overall-architecture.png" alt="Overall architecture"><br><b>Overall architecture</b></td>
-    <td align="center" width="25%"><img src="docs/02-request-lifecycle.png" alt="Request lifecycle"><br><b>Request lifecycle</b></td>
-    <td align="center" width="25%"><img src="docs/03-tool-system.png" alt="Tool system"><br><b>Tool system</b></td>
-    <td align="center" width="25%"><img src="docs/04-multi-agent.png" alt="Multi-agent architecture"><br><b>Multi-agent architecture</b></td>
-  </tr>
-  <tr>
-    <td align="center" width="25%"><img src="docs/05-terminal-ui.png" alt="Terminal UI"><br><b>Terminal UI</b></td>
-    <td align="center" width="25%"><img src="docs/06-permission-security.png" alt="Permissions and security"><br><b>Permissions and security</b></td>
-    <td align="center" width="25%"><img src="docs/07-services-layer.png" alt="Services layer"><br><b>Services layer</b></td>
-    <td align="center" width="25%"><img src="docs/08-state-data-flow.png" alt="State and data flow"><br><b>State and data flow</b></td>
-  </tr>
-</table>
-
----
 
 ## Quick Start
 
@@ -117,23 +118,23 @@ CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 
 ```bash
 # Interactive TUI mode (full interface)
-./bin/claude-haha
+./bin/super-claude-code
 
 # Headless mode (single prompt)
-./bin/claude-haha -p "your prompt here"
+./bin/super-claude-code -p "your prompt here"
 
 # Pipe input
-echo "explain this code" | ./bin/claude-haha -p
+echo "explain this code" | ./bin/super-claude-code -p
 
 # Show all options
-./bin/claude-haha --help
+./bin/super-claude-code --help
 ```
 
 #### Windows
 
 > **Prerequisite**: [Git for Windows](https://git-scm.com/download/win) must be installed (provides Git Bash, which the project's internal shell execution depends on).
 
-The startup script `bin/claude-haha` is a bash script and cannot run directly in cmd or PowerShell. Use one of the following methods:
+The startup script `bin/super-claude-code` is a bash script and cannot run directly in cmd or PowerShell. Use one of the following methods:
 
 **Option 1: PowerShell / cmd — call Bun directly (recommended)**
 
@@ -152,7 +153,7 @@ bun --env-file=.env ./src/localRecoveryCli.ts
 
 ```bash
 # Same usage as macOS / Linux
-./bin/claude-haha
+./bin/super-claude-code
 ```
 
 > **Note**: Some features (voice input, Computer Use, sandbox isolation, etc.) are not available on Windows. This does not affect the core TUI interaction.
@@ -181,7 +182,7 @@ bun --env-file=.env ./src/localRecoveryCli.ts
 If the full TUI has issues, use the simplified readline-based interaction mode:
 
 ```bash
-CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/claude-haha
+CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/super-claude-code
 ```
 
 ---
@@ -204,7 +205,7 @@ The leaked source could not run directly. This repository mainly fixes the follo
 ## Project Structure
 
 ```text
-bin/claude-haha          # Entry script
+bin/super-claude-code          # Entry script
 preload.ts               # Bun preload (sets MACRO globals)
 .env.example             # Environment variable template
 src/

@@ -1,4 +1,4 @@
-# Claude Code Haha
+# Super Claude Code
 
 <p align="right"><strong>中文</strong> | <a href="./README.en.md">English</a></p>
 
@@ -6,9 +6,28 @@
 
 > 原始泄露源码无法直接运行。本仓库修复了启动链路中的多个阻塞问题，使完整的 Ink TUI 交互界面可以在本地工作。
 
-<p align="center">
-  <img src="docs/00runtime.png" alt="运行截图" width="800">
-</p>
+
+## 核心特色
+
+### 🧠 记忆系统（Memory System）
+跨会话持久化记忆，AI 自动提取并存储项目事实、用户偏好、代码约定。上下文随用随取，无需重复告知。
+
+### 💫 灵魂系统（Soul System）
+AI 的「灵魂」——角色设定、行为准则、交流风格持久化。定义汝专属的 AI 伙伴，而非每次重新调教。
+
+### 🖥️ Linux Computer Use
+支持在 Linux 环境下执行 **Computer Use** 任务：
+- 屏幕截图与区域识别
+- 鼠标键盘自动化控制
+- Wayland/X11 输入事件注入
+- 原生 Linux 输入加载器（不依赖 macOS 的 accessibility API）
+
+### ⚡ 性能优化
+- **热加载**：修改代码后秒级生效，无需重启
+- **记忆压缩**：自动合并相似记忆，保持记忆库精简
+- **上下文精简**：智能压缩历史消息，减少 token 消耗
+
+---
 
 ## 功能
 
@@ -20,24 +39,6 @@
 
 ---
 
-## 架构概览
-
-<table>
-  <tr>
-    <td align="center" width="25%"><img src="docs/01-overall-architecture.png" alt="整体架构"><br><b>整体架构</b></td>
-    <td align="center" width="25%"><img src="docs/02-request-lifecycle.png" alt="请求生命周期"><br><b>请求生命周期</b></td>
-    <td align="center" width="25%"><img src="docs/03-tool-system.png" alt="工具系统"><br><b>工具系统</b></td>
-    <td align="center" width="25%"><img src="docs/04-multi-agent.png" alt="多 Agent 架构"><br><b>多 Agent 架构</b></td>
-  </tr>
-  <tr>
-    <td align="center" width="25%"><img src="docs/05-terminal-ui.png" alt="终端 UI"><br><b>终端 UI</b></td>
-    <td align="center" width="25%"><img src="docs/06-permission-security.png" alt="权限与安全"><br><b>权限与安全</b></td>
-    <td align="center" width="25%"><img src="docs/07-services-layer.png" alt="服务层"><br><b>服务层</b></td>
-    <td align="center" width="25%"><img src="docs/08-state-data-flow.png" alt="状态与数据流"><br><b>状态与数据流</b></td>
-  </tr>
-</table>
-
----
 
 ## 快速开始
 
@@ -117,23 +118,23 @@ CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 
 ```bash
 # 交互 TUI 模式（完整界面）
-./bin/claude-haha
+./bin/super-claude-code
 
 # 无头模式（单次问答）
-./bin/claude-haha -p "your prompt here"
+./bin/super-claude-code -p "your prompt here"
 
 # 管道输入
-echo "explain this code" | ./bin/claude-haha -p
+echo "explain this code" | ./bin/super-claude-code -p
 
 # 查看所有选项
-./bin/claude-haha --help
+./bin/super-claude-code --help
 ```
 
 #### Windows
 
 > **前置要求**：必须安装 [Git for Windows](https://git-scm.com/download/win)（提供 Git Bash，项目内部 Shell 执行依赖它）。
 
-Windows 下启动脚本 `bin/claude-haha` 是 bash 脚本，无法在 cmd / PowerShell 中直接运行。请使用以下方式：
+Windows 下启动脚本 `bin/super-claude-code` 是 bash 脚本，无法在 cmd / PowerShell 中直接运行。请使用以下方式：
 
 **方式一：PowerShell / cmd 直接调用 Bun（推荐）**
 
@@ -152,7 +153,7 @@ bun --env-file=.env ./src/localRecoveryCli.ts
 
 ```bash
 # 在 Git Bash 终端中，与 macOS/Linux 用法一致
-./bin/claude-haha
+./bin/super-claude-code
 ```
 
 > **注意**：部分功能（语音输入、Computer Use、Sandbox 隔离等）在 Windows 上不可用，不影响核心 TUI 交互。
@@ -181,7 +182,7 @@ bun --env-file=.env ./src/localRecoveryCli.ts
 如果完整 TUI 出现问题，可以使用简化版 readline 交互模式：
 
 ```bash
-CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/claude-haha
+CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/super-claude-code
 ```
 
 ---
@@ -204,7 +205,7 @@ CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/claude-haha
 ## 项目结构
 
 ```
-bin/claude-haha          # 入口脚本
+bin/super-claude-code          # 入口脚本
 preload.ts               # Bun preload（设置 MACRO 全局变量）
 .env.example             # 环境变量模板
 src/
