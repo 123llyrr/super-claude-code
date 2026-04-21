@@ -42,47 +42,18 @@ Execute **Computer Use** tasks on Linux environments:
 
 ## Quick Start
 
-### 1. Install Bun
+### Prerequisites
 
-This project requires [Bun](https://bun.sh). If Bun is not installed on the target machine yet, use one of the following methods first:
+- [Bun](https://bun.sh) runtime
+- Linux / macOS / Windows (some features limited on Windows)
 
-```bash
-# macOS / Linux (official install script)
-curl -fsSL https://bun.sh/install | bash
-```
-
-If a minimal Linux image reports `unzip is required to install bun`, install `unzip` first:
-
-```bash
-# Ubuntu / Debian
-apt update && apt install -y unzip
-```
-
-```bash
-# macOS (Homebrew)
-brew install bun
-```
-
-```powershell
-# Windows (PowerShell)
-powershell -c "irm bun.sh/install.ps1 | iex"
-```
-
-After installation, reopen the terminal and verify:
-
-```bash
-bun --version
-```
-
-### 2. Install project dependencies
+### 1. Install dependencies
 
 ```bash
 bun install
 ```
 
-### 3. Configure environment variables
-
-Copy the example file and fill in your API key:
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
@@ -91,72 +62,39 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-# API authentication (choose one)
-ANTHROPIC_API_KEY=sk-xxx          # Standard API key via x-api-key header
-ANTHROPIC_AUTH_TOKEN=sk-xxx       # Bearer token via Authorization header
+# Authentication (required, choose one)
+ANTHROPIC_AUTH_TOKEN=your_token_here   # Recommended: Bearer token
+# ANTHROPIC_API_KEY=sk-xxx           # Alternative: API key
 
-# API endpoint (optional, defaults to Anthropic)
+# Endpoint (optional, defaults to Anthropic)
 ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic
 
-# Model configuration
+# Models
 ANTHROPIC_MODEL=MiniMax-M2.7-highspeed
 ANTHROPIC_DEFAULT_SONNET_MODEL=MiniMax-M2.7-highspeed
 ANTHROPIC_DEFAULT_HAIKU_MODEL=MiniMax-M2.7-highspeed
 ANTHROPIC_DEFAULT_OPUS_MODEL=MiniMax-M2.7-highspeed
 
-# Timeout in milliseconds
+# Timeout & telemetry
 API_TIMEOUT_MS=3000000
-
-# Disable telemetry and non-essential network traffic
 DISABLE_TELEMETRY=1
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 ```
 
-### 4. Start
-
-#### macOS / Linux
+### 3. Run
 
 ```bash
-# Interactive TUI mode (full interface)
+# Interactive mode
 ./bin/super-claude-code
 
-# Headless mode (single prompt)
-./bin/super-claude-code -p "your prompt here"
+# Headless mode
+./bin/super-claude-code -p "your question"
 
-# Pipe input
-echo "explain this code" | ./bin/super-claude-code -p
-
-# Show all options
+# Help
 ./bin/super-claude-code --help
 ```
 
-#### Windows
-
-> **Prerequisite**: [Git for Windows](https://git-scm.com/download/win) must be installed (provides Git Bash, which the project's internal shell execution depends on).
-
-The startup script `bin/super-claude-code` is a bash script and cannot run directly in cmd or PowerShell. Use one of the following methods:
-
-**Option 1: PowerShell / cmd — call Bun directly (recommended)**
-
-```powershell
-# Interactive TUI mode
-bun --env-file=.env ./src/entrypoints/cli.tsx
-
-# Headless mode
-bun --env-file=.env ./src/entrypoints/cli.tsx -p "your prompt here"
-
-# Fallback Recovery CLI
-bun --env-file=.env ./src/localRecoveryCli.ts
-```
-
-**Option 2: Run inside Git Bash**
-
-```bash
-# Same usage as macOS / Linux
-./bin/super-claude-code
-```
-
-> **Note**: Some features (voice input, Computer Use, sandbox isolation, etc.) are not available on Windows. This does not affect the core TUI interaction.
+> Windows users: use PowerShell to call Bun directly, or run inside Git Bash. Voice input and Computer Use are not available on Windows.
 
 ---
 
@@ -164,22 +102,20 @@ bun --env-file=.env ./src/localRecoveryCli.ts
 
 | Variable | Required | Description |
 |------|------|------|
-| `ANTHROPIC_API_KEY` | One of two | API key sent via the `x-api-key` header |
-| `ANTHROPIC_AUTH_TOKEN` | One of two | Auth token sent via the `Authorization: Bearer` header |
-| `ANTHROPIC_BASE_URL` | No | Custom API endpoint, defaults to Anthropic |
+| `ANTHROPIC_AUTH_TOKEN` | One of two | Bearer token |
+| `ANTHROPIC_API_KEY` | One of two | API key |
+| `ANTHROPIC_BASE_URL` | No | API endpoint |
 | `ANTHROPIC_MODEL` | No | Default model |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | No | Sonnet-tier model mapping |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | No | Haiku-tier model mapping |
-| `ANTHROPIC_DEFAULT_OPUS_MODEL` | No | Opus-tier model mapping |
-| `API_TIMEOUT_MS` | No | API request timeout, default `600000` (10min) |
-| `DISABLE_TELEMETRY` | No | Set to `1` to disable telemetry |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | No | Set to `1` to disable non-essential network traffic |
+| `ANTHROPIC_DEFAULT_*_MODEL` | No | Per-tier model mapping |
+| `API_TIMEOUT_MS` | No | Timeout in milliseconds |
+| `DISABLE_TELEMETRY` | No | Disable telemetry |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | No | Disable non-essential network requests |
 
 ---
 
 ## Fallback Mode
 
-If the full TUI has issues, use the simplified readline-based interaction mode:
+If the TUI fails, force the simplified readline interface:
 
 ```bash
 CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/super-claude-code
@@ -187,18 +123,19 @@ CLAUDE_CODE_FORCE_RECOVERY_CLI=1 ./bin/super-claude-code
 
 ---
 
-## Fixes Compared with the Original Leaked Source
+## Key Fixes
 
-The leaked source could not run directly. This repository mainly fixes the following issues:
+The leaked source was non-functional. This project fixes critical issues:
 
 | Issue | Root cause | Fix |
 |------|------|------|
-| TUI does not start | The entry script routed no-argument startup to the recovery CLI | Restored the full `cli.tsx` entry |
-| Startup hangs | The `verify` skill imports a missing `.md` file, causing Bun's text loader to hang indefinitely | Added stub `.md` files |
-| `--print` hangs | `filePersistence/types.ts` was missing | Added type stub files |
-| `--print` hangs | `ultraplan/prompt.txt` was missing | Added resource stub files |
-| **Enter key does nothing** | The `modifiers-napi` native package was missing, `isModifierPressed()` threw, `handleEnter` was interrupted, and `onSubmit` never ran | Added try/catch fault tolerance |
-| Setup was skipped | `preload.ts` automatically set `LOCAL_RECOVERY=1`, skipping all initialization | Removed the default setting |
+| TUI unresponsive | Entry routing error, skipped full init on no args | Fixed routing logic |
+| Startup hangs | Missing modules blocked text loader | Added stub files |
+| `--print` broken | Missing type definitions and resources | Added stubs directory |
+| Enter key unresponsive | `isModifierPressed()` exception broke event chain | Added try/catch |
+| Init skipped | `LOCAL_RECOVERY=1` enabled by default | Removed default value |
+| Color diff missing | `color-diff-napi` dependency absent | Created TypeScript stub |
+| Chrome MCP fails | `ant-claude-for-chrome-mcp` protocol missing | Added stub implementation |
 
 ---
 
