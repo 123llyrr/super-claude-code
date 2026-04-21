@@ -54,13 +54,16 @@ export function scoreMemory(
     reference: ['引用', 'reference', 'linear', 'grafana'],
   }
 
-  // Type matching
+  // Type matching (case-insensitive for English)
   if (memory.type && memory.type in typeNames) {
     const typeKeywords = typeNames[memory.type]
-    for (const kw of keywords) {
-      if (typeKeywords.some(tk => kw.includes(tk))) {
-        score += 3
-        break
+    outer: for (const kw of keywords) {
+      const kwLower = kw.toLowerCase()
+      for (const tk of typeKeywords) {
+        if (kwLower.includes(tk.toLowerCase()) || tk.toLowerCase().includes(kwLower)) {
+          score += 3
+          break outer
+        }
       }
     }
   }

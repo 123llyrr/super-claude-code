@@ -11,6 +11,7 @@ export interface CompressionResult {
 
 /**
  * 合并同类记忆为单一摘要文件
+ * 安全版本：先写新文件，再删旧文件，防止数据丢失
  */
 export async function compressMemories(
   memoryDir: string,
@@ -72,7 +73,7 @@ export async function compressMemories(
   // 生成合并后的文件名
   const outputFile = join(dirname(memories[0]!.path), `${type}_merged_${timestamp}.md`)
 
-  // 写入合并文件
+  // 写入合并文件（先写，防止数据丢失）
   const mergedContent = `---
 name: ${type}_merged
 description: ${type}类型记忆合并摘要
@@ -88,7 +89,7 @@ ${mergedLines.join('\n')}
 
   await writeFile(outputFile, mergedContent, 'utf-8')
 
-  // 删除原始文件
+  // 删除原始文件（后删，确保新文件已写入）
   const archived: string[] = []
   for (const m of memories) {
     await unlink(m.path)
@@ -103,7 +104,8 @@ ${mergedLines.join('\n')}
 }
 
 /**
- * 检查是否需要压缩（同类文件超过阈值）
+ * 检查是否需要压缩（同类文件达到阈值）
+ * 阈值含义：5 = 超过5个文件时压缩，即 >= 5
  */
 export async function shouldCompress(
   memoryDir: string,
@@ -125,5 +127,5 @@ export async function shouldCompress(
     }
   }
 
-  return count > threshold
+  return count >= threshold
 }
