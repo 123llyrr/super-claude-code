@@ -167,6 +167,8 @@ export type AppState = DeepImmutable<{
   viewingAgentTaskId?: string
   // Latest companion reaction from the friend observer (src/buddy/observer.ts)
   companionReaction?: string
+  // Latest companion emotion for rendering emotion frames
+  companionEmotion?: import('../buddy/emotions.js').Emotion
   // Timestamp of last /buddy pet — CompanionSprite renders hearts while recent
   companionPetAt?: number
   // TODO (ashwin): see if we can use utility-types DeepReadonly for this
