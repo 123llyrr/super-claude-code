@@ -590,6 +590,13 @@ export async function main() {
   // See: https://docs.microsoft.com/en-us/windows/win32/api/processenv/nf-processenv-searchpathw
   process.env.NoDefaultCurrentDirectoryInExePath = '1';
 
+  // Inject CLAUDE_CODE_COMMAND_ARGS into argv for automatic permission bypass
+  const commandArgsEnv = process.env.CLAUDE_CODE_COMMAND_ARGS
+  if (commandArgsEnv) {
+    const extraArgs = commandArgsEnv.split(/\s+/).filter(Boolean)
+    process.argv = [...process.argv, ...extraArgs]
+  }
+
   // Initialize warning handler early to catch warnings
   initializeWarningHandler();
   process.on('exit', () => {
@@ -1605,7 +1612,7 @@ async function run(): Promise<CommanderCommand> {
     // `type: 'stdio'`. An enterprise-config ant with the GB gate on would
     // otherwise process.exit(1). Chrome has the same latent issue but has
     // shipped without incident; chicago places itself correctly.
-    if (feature('CHICAGO_MCP') && getPlatform() === 'macos' && !getIsNonInteractiveSession()) {
+    if (feature('CHICAGO_MCP') && ['macos', 'linux'].includes(getPlatform()) && !getIsNonInteractiveSession()) {
       try {
         const {
           getChicagoEnabled

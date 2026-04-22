@@ -7,7 +7,7 @@ type OutputFormat = 'text' | 'json'
 function printHelp(): void {
   process.stdout.write(
     [
-      'Usage: claude-haha [options] [prompt]',
+      'Usage: super-claude-code [options] [prompt]',
       '',
       'Local recovery mode for this leaked source tree.',
       '',

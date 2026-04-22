@@ -238,11 +238,12 @@ const claudeInChromeToolRendering =
 // Lazy: wrapper.tsx → hostAdapter.ts → executor.ts pulls both native modules
 // (@ant/computer-use-input + @ant/computer-use-swift). Runtime-gated by
 // GrowthBook tengu_malort_pedway (see gates.ts).
-const computerUseWrapper = feature('CHICAGO_MCP')
+// DEV BYPASS: Always enable computerUseWrapper on Linux
+const computerUseWrapper = (process.platform === 'linux' || feature('CHICAGO_MCP'))
   ? (): typeof import('../../utils/computerUse/wrapper.js') =>
       require('../../utils/computerUse/wrapper.js')
   : undefined
-const isComputerUseMCPServer = feature('CHICAGO_MCP')
+const isComputerUseMCPServer = (process.platform === 'linux' || feature('CHICAGO_MCP'))
   ? (
       require('../../utils/computerUse/common.js') as typeof import('../../utils/computerUse/common.js')
     ).isComputerUseMCPServer

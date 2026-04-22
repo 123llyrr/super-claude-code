@@ -1,11 +1,11 @@
-import { buildComputerUseTools } from '@ant/computer-use-mcp'
+import { buildComputerUseTools } from '../../../deps/@ant/computer-use-mcp/src/index.js'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { buildMcpToolName } from '../../services/mcp/mcpStringUtils.js'
 import type { ScopedMcpServerConfig } from '../../services/mcp/types.js'
 
 import { isInBundledMode } from '../bundledMode.js'
-import { CLI_CU_CAPABILITIES, COMPUTER_USE_MCP_SERVER_NAME } from './common.js'
+import { CLI_CU_CAPABILITIES, CLI_LINUX_CAPABILITIES, COMPUTER_USE_MCP_SERVER_NAME } from './common.js'
 import { getChicagoCoordinateMode } from './gates.js'
 
 /**
@@ -24,8 +24,11 @@ export function setupComputerUseMCP(): {
   mcpConfig: Record<string, ScopedMcpServerConfig>
   allowedTools: string[]
 } {
+  // Use Linux capabilities when on Linux, macOS capabilities otherwise
+  const caps = process.platform === 'linux' ? CLI_LINUX_CAPABILITIES : CLI_CU_CAPABILITIES
+
   const allowedTools = buildComputerUseTools(
-    CLI_CU_CAPABILITIES,
+    caps as typeof CLI_CU_CAPABILITIES,
     getChicagoCoordinateMode(),
   ).map(t => buildMcpToolName(COMPUTER_USE_MCP_SERVER_NAME, t.name))
 

@@ -18,8 +18,14 @@ let cached: ComputerUseInputAPI | undefined
  * Electron (CFRunLoop drains the main queue) this works; under libuv
  * (Node/bun) the main queue never drains and the promise hangs. The executor
  * calls these inside drainRunLoop().
+ *
+ * On non-darwin platforms, this throws to match the original behavior when
+ * the module is loaded. Callers should guard with platform checks.
  */
 export function requireComputerUseInput(): ComputerUseInputAPI {
+  if (process.platform !== 'darwin') {
+    throw new Error('@ant/computer-use-input is macOS-only')
+  }
   if (cached) return cached
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const input = require('@ant/computer-use-input') as ComputerUseInput

@@ -1,13 +1,13 @@
 import type {
   ComputerUseHostAdapter,
   Logger,
-} from '@ant/computer-use-mcp/types'
+} from '../../../deps/@ant/computer-use-mcp/src/types.js'
 import { format } from 'util'
 import { logForDebugging } from '../debug.js'
+import { isBinaryInstalled } from '../binaryCheck.js'
 import { COMPUTER_USE_MCP_SERVER_NAME } from './common.js'
-import { createCliExecutor } from './executor.js'
+import { createCliExecutor, createLinuxExecutor } from './executor.js'
 import { getChicagoEnabled, getChicagoSubGates } from './gates.js'
-import { requireComputerUseSwift } from './swiftLoader.js'
 
 class DebugLogger implements Logger {
   silly(message: string, ...args: unknown[]): void {
@@ -29,23 +29,62 @@ class DebugLogger implements Logger {
 
 let cached: ComputerUseHostAdapter | undefined
 
+// Lazy import for macOS-only modules (throws on non-darwin)
+function requireComputerUseSwift() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('@ant/computer-use-swift')
+}
+
+let cachedSwift: ReturnType<typeof requireComputerUseSwift> | undefined
+
+function getComputerUseSwift() {
+  if (cachedSwift) return cachedSwift
+  cachedSwift = requireComputerUseSwift()
+  return cachedSwift
+}
+
 /**
  * Process-lifetime singleton. Built once on first CU tool call; native modules
  * (both `@ant/computer-use-input` and `@ant/computer-use-swift`) are loaded
  * here via the executor factory, which throws on load failure — there is no
  * degraded mode.
+ *
+ * On Linux, uses the Linux executor (xdotool/ImageMagick/xclip) instead of
+ * the macOS-specific Swift and enigo modules.
  */
 export function getComputerUseHostAdapter(): ComputerUseHostAdapter {
   if (cached) return cached
+
+  const isLinux = process.platform === 'linux'
+
   cached = {
     serverName: COMPUTER_USE_MCP_SERVER_NAME,
     logger: new DebugLogger(),
-    executor: createCliExecutor({
-      getMouseAnimationEnabled: () => getChicagoSubGates().mouseAnimation,
-      getHideBeforeActionEnabled: () => getChicagoSubGates().hideBeforeAction,
-    }),
+    executor: isLinux
+      ? createLinuxExecutor({
+          getMouseAnimationEnabled: () => getChicagoSubGates().mouseAnimation,
+          getHideBeforeActionEnabled: () => getChicagoSubGates().hideBeforeAction,
+        })
+      : createCliExecutor({
+          getMouseAnimationEnabled: () => getChicagoSubGates().mouseAnimation,
+          getHideBeforeActionEnabled: () => getChicagoSubGates().hideBeforeAction,
+        }),
     ensureOsPermissions: async () => {
-      const cu = requireComputerUseSwift()
+      if (isLinux) {
+        // On Linux, check for xdotool availability as a proxy for permissions
+        const [hasXdotool, hasImport, hasXclip] = await Promise.all([
+          isBinaryInstalled('xdotool'),
+          isBinaryInstalled('import'),
+          isBinaryInstalled('xclip'),
+        ])
+        const granted = hasXdotool && hasImport && hasXclip
+        return {
+          granted,
+          accessibility: granted,
+          screenRecording: granted,
+        }
+      }
+      const cu = getComputerUseSwift()
       const accessibility = cu.tcc.checkAccessibility()
       const screenRecording = cu.tcc.checkScreenRecording()
       return accessibility && screenRecording

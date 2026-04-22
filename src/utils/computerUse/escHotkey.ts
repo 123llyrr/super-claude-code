@@ -24,6 +24,8 @@ let registered = false
 
 export function registerEscHotkey(onEscape: () => void): boolean {
   if (registered) return true
+  // Linux doesn't support CGEventTap - Esc abort is not available
+  if (process.platform === 'linux') return false
   const cu = requireComputerUseSwift()
   if (!cu.hotkey.registerEscape(onEscape)) {
     // CGEvent.tapCreate failed — typically missing Accessibility permission.
@@ -39,6 +41,11 @@ export function registerEscHotkey(onEscape: () => void): boolean {
 
 export function unregisterEscHotkey(): void {
   if (!registered) return
+  // Linux doesn't support CGEventTap
+  if (process.platform === 'linux') {
+    registered = false
+    return
+  }
   try {
     requireComputerUseSwift().hotkey.unregister()
   } finally {
@@ -50,5 +57,7 @@ export function unregisterEscHotkey(): void {
 
 export function notifyExpectedEscape(): void {
   if (!registered) return
+  // Linux doesn't support CGEventTap
+  if (process.platform === 'linux') return
   requireComputerUseSwift().hotkey.notifyExpectedEscape()
 }

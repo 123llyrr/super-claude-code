@@ -27,6 +27,18 @@ const TERMINAL_BUNDLE_ID_FALLBACK: Readonly<Record<string, string>> = {
   vscode: 'com.microsoft.VSCode',
 }
 
+const LINUX_TERMINAL_BUNDLE_ID_FALLBACK: Readonly<Record<string, string>> = {
+  konsole: 'org.kde.konsole',
+  'gnome-terminal': 'org.gnome.Terminal',
+  'gnome-terminal-server': 'org.gnome.Terminal',
+  xterm: 'xterm',
+  kitty: 'net.kovidgoyal.kitty',
+  warp: 'dev.warp.Warp-Stable',
+  vscode: 'code',
+  'tmux:': 'tmux',
+  screen: 'screen',
+}
+
 /**
  * Bundle ID of the terminal emulator we're running inside, so `prepareDisplay`
  * can exempt it from hiding and `captureExcluding` can keep it out of
@@ -41,19 +53,35 @@ const TERMINAL_BUNDLE_ID_FALLBACK: Readonly<Record<string, string>> = {
  * terminal window, and the screenshots exclude it regardless.
  */
 export function getTerminalBundleId(): string | null {
-  const cfBundleId = process.env.__CFBundleIdentifier
-  if (cfBundleId) return cfBundleId
-  return TERMINAL_BUNDLE_ID_FALLBACK[env.terminal ?? ''] ?? null
+  if (process.platform === 'darwin') {
+    const cfBundleId = process.env.__CFBundleIdentifier
+    if (cfBundleId) return cfBundleId
+    return TERMINAL_BUNDLE_ID_FALLBACK[env.terminal ?? ''] ?? null
+  }
+  // Linux: use X11 window class or terminal env
+  return LINUX_TERMINAL_BUNDLE_ID_FALLBACK[env.terminal ?? ''] ?? null
 }
 
 /**
- * Static capabilities for macOS CLI. `hostBundleId` is not here — it's added
+ * Linux-specific terminal bundle ID getter. Returns null when undetectable.
+ */
+export function getLinuxTerminalBundleId(): string | null {
+  return LINUX_TERMINAL_BUNDLE_ID_FALLBACK[env.terminal ?? ''] ?? null
+}
+
+/**
+ * Static capabilities for CLI. `hostBundleId` is not here — it's added
  * by `executor.ts` per `ComputerExecutor.capabilities`. `buildComputerUseTools`
  * takes this shape (no `hostBundleId`, no `teachMode`).
  */
 export const CLI_CU_CAPABILITIES = {
   screenshotFiltering: 'native' as const,
   platform: 'darwin' as const,
+}
+
+export const CLI_LINUX_CAPABILITIES = {
+  screenshotFiltering: 'native' as const,
+  platform: 'linux' as const,
 }
 
 export function isComputerUseMCPServer(name: string): boolean {
