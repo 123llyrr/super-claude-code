@@ -84,7 +84,6 @@ export type FooterItem =
   | 'bagel'
   | 'teams'
   | 'bridge'
-  | 'companion'
 
 export type AppState = DeepImmutable<{
   settings: SettingsJson
@@ -104,7 +103,7 @@ export type AppState = DeepImmutable<{
   viewSelectionMode: 'none' | 'selecting-agent' | 'viewing-agent'
   // Which footer pill is focused (arrow-key navigation below the prompt).
   // Lives in AppState so pill components rendered outside PromptInput
-  // (CompanionSprite in REPL.tsx) can read their own focused state.
+  // can read their own focused state.
   footerSelection: FooterItem | null
   toolPermissionContext: ToolPermissionContext
   spinnerTip?: string
@@ -165,12 +164,6 @@ export type AppState = DeepImmutable<{
   foregroundedTaskId?: string
   // Task ID of in-process teammate whose transcript is being viewed (undefined = leader's view)
   viewingAgentTaskId?: string
-  // Latest companion reaction from the friend observer (src/buddy/observer.ts)
-  companionReaction?: string
-  // Latest companion emotion for rendering emotion frames
-  companionEmotion?: import('../buddy/emotions.js').Emotion
-  // Timestamp of last /buddy pet — CompanionSprite renders hearts while recent
-  companionPetAt?: number
   // TODO (ashwin): see if we can use utility-types DeepReadonly for this
   mcp: {
     clients: MCPServerConnection[]
@@ -451,6 +444,12 @@ export type AppState = DeepImmutable<{
   // Races against local UI + bridge + hooks + classifier via claim() in
   // interactiveHandler.ts. Constructed once in useManageMCPConnections.
   channelPermissionCallbacks?: ChannelPermissionCallbacks
+  // Buddy companion state — written by fireCompanionObserver on assistant messages,
+  // read by CompanionSprite for bubble display and emotion-aware sprite frames.
+  companionReaction?: string // Text quip shown in speech bubble
+  companionReactionAt?: number // Timestamp (Date.now()) when companionReaction was set
+  companionEmotion?: 'happy' | 'proud' | 'curious' | 'pensive' | 'tired' | 'snarky' // Current emotion
+  companionPetAt?: number // Timestamp (Date.now()) when /buddy pet was invoked
 }
 
 export type AppStateStore = Store<AppState>
