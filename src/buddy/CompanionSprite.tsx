@@ -246,10 +246,9 @@ export function CompanionSprite(): React.ReactNode {
   let blink = false;
   const emotionFrames = EMOTION_BODIES?.[companion.species]?.[emotion];
   if (emotionFrames) {
-    // Emotion animation: cycle emotion frames
     spriteFrame = tick % emotionFrames.length;
   } else if (reaction || petting) {
-    // Excited: cycle all fidget frames fast
+    // cycle all fidget frames fast
     spriteFrame = tick % frameCount;
   } else {
     const step = IDLE_SEQUENCE[tick % IDLE_SEQUENCE.length]!;
@@ -263,11 +262,7 @@ export function CompanionSprite(): React.ReactNode {
   const body = renderSprite(companion, spriteFrame).map(line => blink ? line.replaceAll(companion.eye, '-') : line);
   const sprite = heartFrame ? [heartFrame, ...body] : body;
 
-  // Name row doubles as hint row — unfocused shows dim name + ↓ discovery,
-  // focused shows inverse name. The enter-to-open hint lives in
-  // PromptInputFooter's right column so this row stays one line and the
-  // sprite doesn't jump up when selected. flexShrink=0 stops the
-  // inline-bubble row wrapper from squeezing the sprite to fit.
+  // flexShrink=0 prevents the inline-bubble row from squeezing the sprite.
   const spriteColumn = <Box flexDirection="column" flexShrink={0} alignItems="center" width={colWidth}>
       {sprite.map((line, i) => <Text key={i} color={i === 0 && heartFrame ? 'autoAccept' : color}>
           {line}
