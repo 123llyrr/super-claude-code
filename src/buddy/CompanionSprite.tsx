@@ -11,7 +11,7 @@ import { getGlobalConfig } from '../utils/config.js';
 import { isFullscreenActive } from '../utils/fullscreen.js';
 import type { Theme } from '../utils/theme.js';
 import { getCompanion } from './companion.js';
-import { renderFace, renderSprite, spriteFrameCount } from './sprites.js';
+import { EMOTION_BODIES, renderFace, renderSprite, spriteFrameCount } from './sprites.js';
 import { RARITY_COLORS } from './types.js';
 const TICK_MS = 500;
 const BUBBLE_SHOW = 20; // ticks → ~10s at 500ms
@@ -176,6 +176,7 @@ export function companionReservedColumns(terminalColumns: number, speaking: bool
 export function CompanionSprite(): React.ReactNode {
   const reaction = useAppState(s => s.companionReaction);
   const petAt = useAppState(s => s.companionPetAt);
+  const emotion = useAppState(s => s.companionEmotion);
   const focused = useAppState(s => s.footerSelection === 'companion');
   const setAppState = useSetAppState();
   const {
@@ -243,7 +244,11 @@ export function CompanionSprite(): React.ReactNode {
   const heartFrame = petting ? PET_HEARTS[petAge % PET_HEARTS.length] : null;
   let spriteFrame: number;
   let blink = false;
-  if (reaction || petting) {
+  const emotionFrames = EMOTION_BODIES?.[companion.species]?.[emotion];
+  if (emotionFrames) {
+    // Emotion animation: cycle emotion frames
+    spriteFrame = tick % emotionFrames.length;
+  } else if (reaction || petting) {
     // Excited: cycle all fidget frames fast
     spriteFrame = tick % frameCount;
   } else {
