@@ -1,5 +1,4 @@
-export const EMOTIONS = ['happy', 'proud', 'curious', 'pensive', 'tired', 'snarky'] as const
-export type Emotion = (typeof EMOTIONS)[number]
+type Emotion = 'happy' | 'proud' | 'curious' | 'pensive' | 'tired' | 'snarky'
 
 export const ADJACENT_TRANSITIONS: Record<Emotion, Emotion[]> = {
   happy: ['proud'],
@@ -10,17 +9,26 @@ export const ADJACENT_TRANSITIONS: Record<Emotion, Emotion[]> = {
   snarky: ['pensive'],
 }
 
+export const EMOTIONS: readonly Emotion[] = Object.keys(ADJACENT_TRANSITIONS) as Emotion[]
+export type { Emotion }
+
 const HAPPY_PATTERNS = [/大善|妙哉|太棒了|完美|搞定|✅/i]
 const PROUD_PATTERNS = [/吾已尽知|汝当如是|不过尔尔|已知之/i]
 const CURIOUS_PATTERNS = [/有趣|何解|且慢|如何是好|[？?]/i]
 const SNARKY_PATTERNS = [/此乃小患|小恙|何足挂齿|问题不大/i]
 
+const EMOTION_PATTERNS: Array<{ patterns: RegExp[], emotion: Emotion }> = [
+  { patterns: SNARKY_PATTERNS, emotion: 'snarky' },
+  { patterns: PROUD_PATTERNS, emotion: 'proud' },
+  { patterns: HAPPY_PATTERNS, emotion: 'happy' },
+  { patterns: CURIOUS_PATTERNS, emotion: 'curious' },
+]
+
 export function detectEmotionFromText(text: string): Emotion | null {
-  if (SNARKY_PATTERNS.some(p => p.test(text))) return 'snarky'
-  if (PROUD_PATTERNS.some(p => p.test(text))) return 'proud'
-  if (HAPPY_PATTERNS.some(p => p.test(text))) return 'happy'
-  if (CURIOUS_PATTERNS.some(p => p.test(text))) return 'curious'
-  if (text.length > 200 && !HAPPY_PATTERNS.some(p => p.test(text)) && !PROUD_PATTERNS.some(p => p.test(text))) return 'pensive'
+  for (const { patterns, emotion } of EMOTION_PATTERNS) {
+    if (patterns.some(p => p.test(text))) return emotion
+  }
+  if (text.length > 200) return 'pensive'
   return null
 }
 
