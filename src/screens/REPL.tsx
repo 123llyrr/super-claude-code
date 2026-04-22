@@ -275,6 +275,7 @@ import { IssueFlagBanner } from '../components/PromptInput/IssueFlagBanner.js';
 import { useIssueFlagBanner } from '../hooks/useIssueFlagBanner.js';
 import { CompanionSprite, CompanionFloatingBubble, MIN_COLS_FOR_FULL_SPRITE } from '../buddy/CompanionSprite.js';
 import { fireCompanionObserver } from '../buddy/observer.js';
+import { canTransition } from '../buddy/emotions.js';
 import { DevBar } from '../components/DevBar.js';
 // Session manager removed - using AppState now
 import type { RemoteSessionConfig } from '../remote/RemoteSessionManager.js';
@@ -2803,10 +2804,20 @@ export function REPL({
       onQueryEvent(event);
     }
     if (feature('BUDDY')) {
-      void fireCompanionObserver(messagesRef.current, reaction => setAppState(prev => prev.companionReaction === reaction ? prev : {
-        ...prev,
-        companionReaction: reaction
-      }));
+      void fireCompanionObserver(
+        messagesRef.current,
+        reaction => setAppState(prev => prev.companionReaction === reaction ? prev : {
+          ...prev,
+          companionReaction: reaction
+        }),
+        emotion => {
+          setAppState(prev => {
+            const current = prev.companionEmotion ?? 'happy'
+            if (!canTransition(current, emotion)) return prev
+            return { ...prev, companionEmotion: emotion }
+          })
+        }
+      );
     }
     queryCheckpoint('query_end');
 

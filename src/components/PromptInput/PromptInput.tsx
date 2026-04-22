@@ -871,7 +871,7 @@ function PromptInput({
     typingRef.current.chars = value.length;
 
     // Trigger emotion based on typing speed
-    if (typingRef.current.speed > 5) {
+    if (feature('BUDDY') && typingRef.current.speed > 5) {
       setAppState(prev => ({ ...prev, companionEmotion: 'curious' }));
     } else if (typingRef.current.speed < 1 && value.length > 20) {
       setAppState(prev => ({ ...prev, companionEmotion: 'pensive' }));

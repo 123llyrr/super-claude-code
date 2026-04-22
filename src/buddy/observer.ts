@@ -14,6 +14,7 @@ function extractReplyText(messages: Message[]): string {
 export async function fireCompanionObserver(
   messages: Message[],
   onReaction: ReactionCallback,
+  onEmotion?: (emotion: Emotion) => void,
 ): Promise<void> {
   const companion = getCompanion()
   if (!companion) return
@@ -23,6 +24,9 @@ export async function fireCompanionObserver(
 
   const emotion = detectEmotionFromText(text)
   if (!emotion) return
+
+  // If caller provided onEmotion, call it with the detected emotion
+  onEmotion?.(emotion)
 
   const quips: Record<Emotion, string[]> = {
     happy: ['大善！', '妙哉！', '太棒了！'],
