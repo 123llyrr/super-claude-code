@@ -285,6 +285,7 @@ function PromptInput({
   }
   const store = useAppStateStore();
   const setAppState = useSetAppState();
+  const typingRef = useRef({ lastTime: Date.now(), chars: 0, speed: 0 });
   const tasks = useAppState(s => s.tasks);
   const replBridgeConnected = useAppState(s => s.replBridgeConnected);
   const replBridgeExplicit = useAppState(s => s.replBridgeExplicit);
@@ -858,6 +859,23 @@ function PromptInput({
       return;
     }
     setHelpOpen(false);
+
+    // Track typing speed and update companion emotion
+    const now = Date.now();
+    const dt = now - typingRef.current.lastTime;
+    const dchars = value.length - typingRef.current.chars;
+    if (dt > 0) {
+      typingRef.current.speed = (dchars / dt) * 1000;
+    }
+    typingRef.current.lastTime = now;
+    typingRef.current.chars = value.length;
+
+    // Trigger emotion based on typing speed
+    if (typingRef.current.speed > 5) {
+      setAppState(prev => ({ ...prev, companionEmotion: 'curious' }));
+    } else if (typingRef.current.speed < 1 && value.length > 20) {
+      setAppState(prev => ({ ...prev, companionEmotion: 'pensive' }));
+    }
 
     // Dismiss stash hint when user makes any input change
     dismissStashHint();
