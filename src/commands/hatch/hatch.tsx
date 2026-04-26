@@ -2,7 +2,7 @@ import * as React from 'react'
 import type { LocalJSXCommandOnDone, LocalJSXCommandContext } from '../../types/command.js'
 import { rehatchCompanion } from '../../buddy/companion.js'
 import { Box, Text } from '../../ink.js'
-import { RARITY_STARS, RARITY_COLORS, STAT_NAMES, type Rarity } from '../../buddy/types.js'
+import { RARITY_STARS, RARITY_COLORS, STAT_NAMES } from '../../buddy/types.js'
 import { renderSprite } from '../../buddy/sprites.js'
 import type { KeyboardEvent } from '../../ink/events/keyboard-event.js'
 
@@ -78,7 +78,7 @@ function Result({
           {STAT_NAMES.map(stat => (
             <Text key={stat} dimColor>
               <Text color="cyan">{stat.slice(0, 4)}.</Text>{' '}
-              {renderStatBar(companion.stats[stat], companion.rarity)}
+              {renderStatBar(companion.stats[stat])}
             </Text>
           ))}
         </Box>
@@ -87,7 +87,7 @@ function Result({
   )
 }
 
-function renderStatBar(value: number, rarity: Rarity): React.ReactNode {
+function renderStatBar(value: number): React.ReactNode {
   const filled = Math.round(value / 5)
   const empty = 20 - filled
   const bar = '█'.repeat(filled) + '░'.repeat(empty)
