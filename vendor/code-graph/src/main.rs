@@ -1,22 +1,24 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 mod graph;
+mod semantic;
+mod tool;
 
+use graph::indexer::GraphIndexer;
 use graph::{resolve, CodeGraph};
 
 /// Global graph indexer, lazily initialized.
-static mut GRAPH: Option<CodeGraph> = None;
-
-fn graph() -> &'static mut CodeGraph {
-    unsafe {
-        if GRAPH.is_none() {
-            GRAPH = Some(CodeGraph::new());
-        }
-        GRAPH.as_mut().unwrap()
-    }
-}
+static INDEXER: once_cell::sync::Lazy<Arc<RwLock<GraphIndexer>>> =
+    once_cell::sync::Lazy::new(|| {
+        Arc::new(RwLock::new(GraphIndexer::new(
+            Arc::new(RwLock::new(CodeGraph::new())),
+            PathBuf::from("."),
+        )))
+    });
 
 // ---------------------------------------------------------------------------
 // IPC protocol types
@@ -45,6 +47,7 @@ pub struct QueryParams {
     pub file_path: Option<String>,
     pub symbol_id: Option<u64>,
     pub name: Option<String>,
+    pub to: Option<String>, // for trace_chain
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -81,23 +84,36 @@ impl Response {
 // Command handlers
 // ---------------------------------------------------------------------------
 
-fn handle_init(project_dir: String, id: u64) -> Response {
+async fn handle_init(project_dir: String, id: u64) -> Response {
     eprintln!("[code-graph] init project_dir={}", project_dir);
-    let g = graph();
-    let node_count = g.node_count();
-    let file_count = g.file_count();
+
+    // Set project directory and spawn background indexing task
+    let indexer = Arc::clone(&INDEXER);
+    {
+        let mut indexer_mut = indexer.write();
+        indexer_mut.set_project_dir(PathBuf::from(&project_dir));
+    }
+
+    // Spawn background indexing task
+    tokio::spawn(async move {
+        let mut indexer = indexer.write();
+        indexer.index_all();
+    });
+
+    // Return immediately — indexing happens in background
     Response::success(
         id,
         serde_json::json!({
-            "ready": g.is_ready(),
-            "node_count": node_count,
-            "file_count": file_count,
+            "ready": false,
+            "node_count": 0,
+            "file_count": 0,
         }),
     )
 }
 
-fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
-    let g = graph();
+async fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
+    let indexer = INDEXER.read();
+    let graph = indexer.graph.read();
 
     match method {
         "list_symbols" => {
@@ -107,11 +123,11 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                     return Response::error(id, "list_symbols requires file_path");
                 }
             };
-            let symbols = g
+            let symbols = graph
                 .symbols_in_file(&file_path)
                 .map(|ids| {
                     ids.iter()
-                        .filter_map(|&id| g.node(id))
+                        .filter_map(|&id| graph.node(id))
                         .map(|n| {
                             serde_json::json!({
                                 "id": n.id,
@@ -136,7 +152,7 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(id) => id,
                 None => return Response::error(id, "node requires symbol_id"),
             };
-            match g.node(symbol_id) {
+            match graph.node(symbol_id) {
                 Some(n) => Response::success(
                     id,
                     serde_json::json!({
@@ -154,12 +170,12 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
             }
         }
 
-        "find_by_name" => {
+        "find_references" | "find_by_name" => {
             let name = match &params.name {
                 Some(n) => n.as_str(),
                 None => return Response::error(id, "find_by_name requires name"),
             };
-            let results: Vec<serde_json::Value> = g
+            let results: Vec<serde_json::Value> = graph
                 .find_by_name(name)
                 .iter()
                 .map(|n| {
@@ -181,7 +197,7 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(id) => id,
                 None => return Response::error(id, "callers requires symbol_id"),
             };
-            let callers: Vec<serde_json::Value> = g
+            let callers: Vec<serde_json::Value> = graph
                 .callers(symbol_id)
                 .map(|edges| {
                     edges
@@ -204,7 +220,7 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(id) => id,
                 None => return Response::error(id, "callees requires symbol_id"),
             };
-            let callees: Vec<serde_json::Value> = g
+            let callees: Vec<serde_json::Value> = graph
                 .callees(symbol_id)
                 .map(|edges| {
                     edges
@@ -223,31 +239,80 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
         }
 
         "trace_callers" => {
-            let symbol_id = match params.symbol_id {
-                Some(id) => id,
-                None => return Response::error(id, "trace_callers requires symbol_id"),
+            let symbol = match &params.name {
+                Some(n) => n.as_str(),
+                None => return Response::error(id, "trace_callers requires 'symbol' param"),
             };
             let depth = params
                 .file_path
                 .as_ref()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(3);
-            let result: Vec<(u64, usize)> = g.trace_callers(symbol_id, depth);
-            Response::success(id, serde_json::json!({ "trace": result }))
+            let candidates = graph.find_by_name(symbol);
+            let sym_id = match candidates.first() {
+                Some(n) => n.id,
+                None => return Response::success(id, serde_json::json!({ "callers": [] })),
+            };
+            let result: Vec<(u64, usize)> = graph.trace_callers(sym_id, depth);
+            Response::success(id, serde_json::json!({ "callers": result }))
         }
 
         "trace_callees" => {
-            let symbol_id = match params.symbol_id {
-                Some(id) => id,
-                None => return Response::error(id, "trace_callees requires symbol_id"),
+            let symbol = match &params.name {
+                Some(n) => n.as_str(),
+                None => return Response::error(id, "trace_callees requires 'symbol' param"),
             };
             let depth = params
                 .file_path
                 .as_ref()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(3);
-            let result: Vec<(u64, usize)> = g.trace_callees(symbol_id, depth);
-            Response::success(id, serde_json::json!({ "trace": result }))
+            let candidates = graph.find_by_name(symbol);
+            let sym_id = match candidates.first() {
+                Some(n) => n.id,
+                None => return Response::success(id, serde_json::json!({ "callees": [] })),
+            };
+            let result: Vec<(u64, usize)> = graph.trace_callees(sym_id, depth);
+            Response::success(id, serde_json::json!({ "callees": result }))
+        }
+
+        "trace_chain" => {
+            let from = match &params.name {
+                Some(n) => n.as_str(),
+                None => return Response::error(id, "trace_chain requires 'from' param"),
+            };
+            let to = match &params.to {
+                Some(t) => t.as_str(),
+                None => return Response::error(id, "trace_chain requires 'to' param"),
+            };
+            let result = tool::trace_chain::trace_chain(&graph, from, to);
+            Response::success(id, serde_json::json!({ "output": result.output }))
+        }
+
+        "file_deps" => {
+            let file_path = match &params.file_path {
+                Some(p) => p.as_str(),
+                None => return Response::error(id, "file_deps requires file_path"),
+            };
+            let depth = params
+                .name
+                .as_ref()
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(3);
+            let result = tool::file_deps::file_deps(&graph, file_path, depth);
+            // Parse the JSON output string back into structured data
+            let parsed: serde_json::Value =
+                serde_json::from_str(&result.output).unwrap_or(serde_json::Value::Null);
+            Response::success(id, parsed)
+        }
+
+        "blast_radius" => {
+            let file_path = match &params.file_path {
+                Some(p) => p.as_str(),
+                None => return Response::error(id, "blast_radius requires file_path"),
+            };
+            let result = tool::blast_radius::blast_radius(&graph, file_path);
+            Response::success(id, serde_json::json!({ "output": result.output }))
         }
 
         "shortest_path" => {
@@ -269,7 +334,7 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                     )
                 }
             };
-            match g.shortest_path(from, to) {
+            match graph.shortest_path(from, to) {
                 Some(path) => Response::success(id, serde_json::json!({ "path": path })),
                 None => Response::success(id, serde_json::json!({ "path": null })),
             }
@@ -285,7 +350,7 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 .as_ref()
                 .and_then(|n| n.parse().ok())
                 .unwrap_or(2);
-            let deps: Vec<String> = g
+            let deps: Vec<String> = graph
                 .file_dependents(&file_path, depth)
                 .iter()
                 .map(|p| p.to_string_lossy().to_string())
@@ -294,7 +359,6 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
         }
 
         "resolve_callee" => {
-            // params.name = callee_name, params.file_path = caller_file
             let callee_name = match &params.name {
                 Some(n) => n.as_str(),
                 None => return Response::error(id, "resolve_callee requires name"),
@@ -304,10 +368,13 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 None => return Response::error(id, "resolve_callee requires file_path"),
             };
             let imported_names: Vec<String> = serde_json::from_value(
-                params.symbol_id.map(|_| serde_json::Value::Array(vec![])).unwrap_or(serde_json::Value::Null)
-            ).unwrap_or_default();
-            // Note: for a full implementation we'd parse import statements; here we use an empty list
-            match resolve::resolve_callee(g, callee_name, &caller_file, &imported_names) {
+                params
+                    .symbol_id
+                    .map(|_| serde_json::Value::Array(vec![]))
+                    .unwrap_or(serde_json::Value::Null),
+            )
+            .unwrap_or_default();
+            match resolve::resolve_callee(&graph, callee_name, &caller_file, &imported_names) {
                 Some(id) => Response::success(id, serde_json::json!({ "symbol_id": id })),
                 None => Response::success(id, serde_json::json!({ "symbol_id": null })),
             }
@@ -317,27 +384,33 @@ fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
     }
 }
 
-fn handle_index_file(path: &str, id: u64) -> Response {
+async fn handle_index_file(path: &str, id: u64) -> Response {
     eprintln!("[code-graph] index_file path={}", path);
-    // Indexing will be implemented in a later task (Task 2)
-    // For now, just acknowledge the request
+
+    let path_buf = PathBuf::from(path);
+    let indexer = Arc::clone(&INDEXER);
+    tokio::spawn(async move {
+        let mut indexer = indexer.write();
+        indexer.reindex_file(&path_buf);
+    });
+
     Response::success(
         id,
         serde_json::json!({
-            "indexed": false,
-            "reason": "indexer not yet implemented"
+            "indexed": true,
         }),
     )
 }
 
-fn handle_ready(id: u64) -> Response {
-    let g = graph();
+async fn handle_ready(id: u64) -> Response {
+    let indexer = INDEXER.read();
+    let graph = indexer.graph.read();
     Response::success(
         id,
         serde_json::json!({
-            "ready": g.is_ready(),
-            "node_count": g.node_count(),
-            "file_count": g.file_count(),
+            "ready": graph.is_ready(),
+            "node_count": graph.node_count(),
+            "file_count": graph.file_count(),
         }),
     )
 }
@@ -346,7 +419,8 @@ fn handle_ready(id: u64) -> Response {
 // Main loop
 // ---------------------------------------------------------------------------
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Unbuffered line buffering for stdout (JSON responses)
     use std::io::{self, Write};
     let mut stdout = io::BufWriter::new(io::stdout());
@@ -378,10 +452,14 @@ fn main() {
             };
 
             let resp: Response = match &cmd.params {
-                CommandParams::Init { project_dir } => handle_init(project_dir.clone(), cmd.id),
-                CommandParams::Query { method, params } => handle_query(method, params, cmd.id),
-                CommandParams::IndexFile { path } => handle_index_file(path, cmd.id),
-                CommandParams::Ready {} => handle_ready(cmd.id),
+                CommandParams::Init { project_dir } => {
+                    handle_init(project_dir.clone(), cmd.id).await
+                }
+                CommandParams::Query { method, params } => {
+                    handle_query(method, params, cmd.id).await
+                }
+                CommandParams::IndexFile { path } => handle_index_file(path, cmd.id).await,
+                CommandParams::Ready {} => handle_ready(cmd.id).await,
                 CommandParams::Unknown => Response::error(cmd.id, "unknown command"),
             };
 

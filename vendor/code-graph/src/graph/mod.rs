@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+pub mod indexer;
 pub mod resolve;
 
 pub type SymbolId = u64;
