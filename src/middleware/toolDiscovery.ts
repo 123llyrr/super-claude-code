@@ -8,8 +8,6 @@ export interface ToolDiscoveryMiddleware {
   enabled: boolean
   autoHighlight: boolean
   searchEngine: SearchEngine
-
-  processInput(input: string): SearchResult[]
 }
 
 export function createToolDiscoveryMiddleware(): ToolDiscoveryMiddleware {
