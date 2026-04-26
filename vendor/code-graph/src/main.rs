@@ -1,0 +1,392 @@
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+mod graph;
+
+use graph::{resolve, CodeGraph};
+
+/// Global graph indexer, lazily initialized.
+static mut GRAPH: Option<CodeGraph> = None;
+
+fn graph() -> &'static mut CodeGraph {
+    unsafe {
+        if GRAPH.is_none() {
+            GRAPH = Some(CodeGraph::new());
+        }
+        GRAPH.as_mut().unwrap()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IPC protocol types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Command {
+    pub cmd: String,
+    #[serde(flatten)]
+    pub params: CommandParams,
+    pub id: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CommandParams {
+    Init { project_dir: String },
+    Query { method: String, params: QueryParams },
+    IndexFile { path: String },
+    Ready {},
+    Unknown,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QueryParams {
+    pub file_path: Option<String>,
+    pub symbol_id: Option<u64>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Response {
+    pub id: u64,
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl Response {
+    fn success(id: u64, result: serde_json::Value) -> Self {
+        Self {
+            id,
+            ok: true,
+            result: Some(result),
+            error: None,
+        }
+    }
+
+    fn error(id: u64, msg: &str) -> Self {
+        Self {
+            id,
+            ok: false,
+            result: None,
+            error: Some(msg.to_string()),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Command handlers
+// ---------------------------------------------------------------------------
+
+fn handle_init(project_dir: String, id: u64) -> Response {
+    eprintln!("[code-graph] init project_dir={}", project_dir);
+    let g = graph();
+    let node_count = g.node_count();
+    let file_count = g.file_count();
+    Response::success(
+        id,
+        serde_json::json!({
+            "ready": g.is_ready(),
+            "node_count": node_count,
+            "file_count": file_count,
+        }),
+    )
+}
+
+fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
+    let g = graph();
+
+    match method {
+        "list_symbols" => {
+            let file_path = match &params.file_path {
+                Some(p) => PathBuf::from(p),
+                None => {
+                    return Response::error(id, "list_symbols requires file_path");
+                }
+            };
+            let symbols = g
+                .symbols_in_file(&file_path)
+                .map(|ids| {
+                    ids.iter()
+                        .filter_map(|&id| g.node(id))
+                        .map(|n| {
+                            serde_json::json!({
+                                "id": n.id,
+                                "name": n.name,
+                                "kind": format!("{:?}", n.kind),
+                                "visibility": format!("{:?}", n.visibility),
+                                "file": n.file,
+                                "start_line": n.start_line,
+                                "end_line": n.end_line,
+                                "signature": n.signature,
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            Response::success(id, serde_json::json!({ "symbols": symbols }))
+        }
+
+        "node" => {
+            let symbol_id = match params.symbol_id {
+                Some(id) => id,
+                None => return Response::error(id, "node requires symbol_id"),
+            };
+            match g.node(symbol_id) {
+                Some(n) => Response::success(
+                    id,
+                    serde_json::json!({
+                        "id": n.id,
+                        "name": n.name,
+                        "kind": format!("{:?}", n.kind),
+                        "visibility": format!("{:?}", n.visibility),
+                        "file": n.file,
+                        "start_line": n.start_line,
+                        "end_line": n.end_line,
+                        "signature": n.signature,
+                    }),
+                ),
+                None => Response::error(id, "symbol not found"),
+            }
+        }
+
+        "find_by_name" => {
+            let name = match &params.name {
+                Some(n) => n.as_str(),
+                None => return Response::error(id, "find_by_name requires name"),
+            };
+            let results: Vec<serde_json::Value> = g
+                .find_by_name(name)
+                .iter()
+                .map(|n| {
+                    serde_json::json!({
+                        "id": n.id,
+                        "name": n.name,
+                        "kind": format!("{:?}", n.kind),
+                        "file": n.file,
+                        "start_line": n.start_line,
+                        "end_line": n.end_line,
+                    })
+                })
+                .collect();
+            Response::success(id, serde_json::json!({ "symbols": results }))
+        }
+
+        "callers" => {
+            let symbol_id = match params.symbol_id {
+                Some(id) => id,
+                None => return Response::error(id, "callers requires symbol_id"),
+            };
+            let callers: Vec<serde_json::Value> = g
+                .callers(symbol_id)
+                .map(|edges| {
+                    edges
+                        .iter()
+                        .map(|e| {
+                            serde_json::json!({
+                                "to": e.to,
+                                "kind": format!("{:?}", e.kind),
+                                "line": e.line,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Response::success(id, serde_json::json!({ "callers": callers }))
+        }
+
+        "callees" => {
+            let symbol_id = match params.symbol_id {
+                Some(id) => id,
+                None => return Response::error(id, "callees requires symbol_id"),
+            };
+            let callees: Vec<serde_json::Value> = g
+                .callees(symbol_id)
+                .map(|edges| {
+                    edges
+                        .iter()
+                        .map(|e| {
+                            serde_json::json!({
+                                "to": e.to,
+                                "kind": format!("{:?}", e.kind),
+                                "line": e.line,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Response::success(id, serde_json::json!({ "callees": callees }))
+        }
+
+        "trace_callers" => {
+            let symbol_id = match params.symbol_id {
+                Some(id) => id,
+                None => return Response::error(id, "trace_callers requires symbol_id"),
+            };
+            let depth = params
+                .file_path
+                .as_ref()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(3);
+            let result: Vec<(u64, usize)> = g.trace_callers(symbol_id, depth);
+            Response::success(id, serde_json::json!({ "trace": result }))
+        }
+
+        "trace_callees" => {
+            let symbol_id = match params.symbol_id {
+                Some(id) => id,
+                None => return Response::error(id, "trace_callees requires symbol_id"),
+            };
+            let depth = params
+                .file_path
+                .as_ref()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(3);
+            let result: Vec<(u64, usize)> = g.trace_callees(symbol_id, depth);
+            Response::success(id, serde_json::json!({ "trace": result }))
+        }
+
+        "shortest_path" => {
+            let from = match params.symbol_id {
+                Some(id) => id,
+                None => return Response::error(id, "shortest_path requires symbol_id"),
+            };
+            let to = params
+                .name
+                .as_ref()
+                .and_then(|n| n.parse().ok())
+                .or_else(|| params.file_path.as_ref().and_then(|p| p.parse().ok()));
+            let to = match to {
+                Some(t) => t,
+                None => {
+                    return Response::error(
+                        id,
+                        "shortest_path requires 'name' or 'file_path' as second id",
+                    )
+                }
+            };
+            match g.shortest_path(from, to) {
+                Some(path) => Response::success(id, serde_json::json!({ "path": path })),
+                None => Response::success(id, serde_json::json!({ "path": null })),
+            }
+        }
+
+        "file_dependents" => {
+            let file_path = match &params.file_path {
+                Some(p) => PathBuf::from(p),
+                None => return Response::error(id, "file_dependents requires file_path"),
+            };
+            let depth: usize = params
+                .name
+                .as_ref()
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(2);
+            let deps: Vec<String> = g
+                .file_dependents(&file_path, depth)
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+            Response::success(id, serde_json::json!({ "dependents": deps }))
+        }
+
+        "resolve_callee" => {
+            // params.name = callee_name, params.file_path = caller_file
+            let callee_name = match &params.name {
+                Some(n) => n.as_str(),
+                None => return Response::error(id, "resolve_callee requires name"),
+            };
+            let caller_file = match &params.file_path {
+                Some(p) => PathBuf::from(p),
+                None => return Response::error(id, "resolve_callee requires file_path"),
+            };
+            let imported_names: Vec<String> = serde_json::from_value(
+                params.symbol_id.map(|_| serde_json::Value::Array(vec![])).unwrap_or(serde_json::Value::Null)
+            ).unwrap_or_default();
+            // Note: for a full implementation we'd parse import statements; here we use an empty list
+            match resolve::resolve_callee(g, callee_name, &caller_file, &imported_names) {
+                Some(id) => Response::success(id, serde_json::json!({ "symbol_id": id })),
+                None => Response::success(id, serde_json::json!({ "symbol_id": null })),
+            }
+        }
+
+        _ => Response::error(id, &format!("unknown query method: {}", method)),
+    }
+}
+
+fn handle_index_file(path: &str, id: u64) -> Response {
+    eprintln!("[code-graph] index_file path={}", path);
+    // Indexing will be implemented in a later task (Task 2)
+    // For now, just acknowledge the request
+    Response::success(
+        id,
+        serde_json::json!({
+            "indexed": false,
+            "reason": "indexer not yet implemented"
+        }),
+    )
+}
+
+fn handle_ready(id: u64) -> Response {
+    let g = graph();
+    Response::success(
+        id,
+        serde_json::json!({
+            "ready": g.is_ready(),
+            "node_count": g.node_count(),
+            "file_count": g.file_count(),
+        }),
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------------
+
+fn main() {
+    // Unbuffered line buffering for stdout (JSON responses)
+    use std::io::{self, Write};
+    let mut stdout = io::BufWriter::new(io::stdout());
+
+    loop {
+        let mut line = String::new();
+        if let Ok(bytes) = io::stdin().read_line(&mut line) {
+            if bytes == 0 {
+                break; // EOF
+            }
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            let cmd: Command = match serde_json::from_str(line) {
+                Ok(c) => c,
+                Err(e) => {
+                    let resp = Response {
+                        id: 0,
+                        ok: false,
+                        result: None,
+                        error: Some(format!("parse error: {}", e)),
+                    };
+                    writeln!(stdout, "{}", serde_json::to_string(&resp).unwrap()).unwrap();
+                    stdout.flush().unwrap();
+                    continue;
+                }
+            };
+
+            let resp: Response = match &cmd.params {
+                CommandParams::Init { project_dir } => handle_init(project_dir.clone(), cmd.id),
+                CommandParams::Query { method, params } => handle_query(method, params, cmd.id),
+                CommandParams::IndexFile { path } => handle_index_file(path, cmd.id),
+                CommandParams::Ready {} => handle_ready(cmd.id),
+                CommandParams::Unknown => Response::error(cmd.id, "unknown command"),
+            };
+
+            writeln!(stdout, "{}", serde_json::to_string(&resp).unwrap()).unwrap();
+            stdout.flush().unwrap();
+        }
+    }
+}
