@@ -21,7 +21,7 @@ export const ConfigScopeSchema = lazySchema(() =>
 export type ConfigScope = z.infer<ReturnType<typeof ConfigScopeSchema>>
 
 export const TransportSchema = lazySchema(() =>
-  z.enum(['stdio', 'sse', 'sse-ide', 'http', 'ws', 'sdk']),
+  z.enum(['stdio', 'sse', 'sse-ide', 'http', 'ws', 'sdk', 'code-graph']),
 )
 export type Transport = z.infer<ReturnType<typeof TransportSchema>>
 
@@ -112,6 +112,13 @@ export const McpSdkServerConfigSchema = lazySchema(() =>
   }),
 )
 
+// Internal server type for built-in code graph
+export const McpCodeGraphServerConfigSchema = lazySchema(() =>
+  z.object({
+    type: z.literal('code-graph'),
+  }),
+)
+
 // Config type for Claude.ai proxy servers
 export const McpClaudeAIProxyServerConfigSchema = lazySchema(() =>
   z.object({
@@ -131,6 +138,7 @@ export const McpServerConfigSchema = lazySchema(() =>
     McpWebSocketServerConfigSchema(),
     McpSdkServerConfigSchema(),
     McpClaudeAIProxyServerConfigSchema(),
+    McpCodeGraphServerConfigSchema(),
   ]),
 )
 
@@ -157,6 +165,9 @@ export type McpSdkServerConfig = z.infer<
 >
 export type McpClaudeAIProxyServerConfig = z.infer<
   ReturnType<typeof McpClaudeAIProxyServerConfigSchema>
+>
+export type McpCodeGraphServerConfig = z.infer<
+  ReturnType<typeof McpCodeGraphServerConfigSchema>
 >
 export type McpServerConfig = z.infer<ReturnType<typeof McpServerConfigSchema>>
 
