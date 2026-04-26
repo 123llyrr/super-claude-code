@@ -9,7 +9,10 @@ import {
 import {
   companionUserId,
   getCompanion,
+  rehatchCompanion,
   roll,
+  generateFallbackName,
+  generateFallbackPersonality,
 } from '../buddy/companion.js'
 import {
   RARITY_STARS,
@@ -19,47 +22,6 @@ import {
 } from '../buddy/types.js'
 import { renderSprite } from '../buddy/sprites.js'
 import { enableConfigs, saveGlobalConfig } from '../utils/config.js'
-
-// Simple name generation based on species and stats (fallback when no AI-generated name)
-const SPECIES_PREFIX: Record<string, string[]> = {
-  duck: ['Quackers', 'Ducky', 'Waddle', 'Puddles'],
-  goose: ['Gus', 'Grace', 'Honker', 'Serena'],
-  blob: ['Blobby', 'Gloop', 'Puddles', 'Goober'],
-  cat: ['Whiskers', 'Mittens', 'Luna', 'Shadow'],
-  dragon: ['Spark', 'Ember', 'Scales', 'Flame'],
-  octopus: ['Ink', 'Splash', 'Tentie', 'Coral'],
-  owl: ['Hoot', 'Sage', 'Night', 'Misty'],
-  penguin: ['Waddle', 'Slippy', 'Frost', 'Pebble'],
-  turtle: ['Shelly', 'Tank', 'Shell', 'Slowpoke'],
-  snail: ['Shiny', 'Glide', 'Squish', 'Dewdrop'],
-  ghost: ['Spooky', 'Boo', 'Misty', 'Phantom'],
-  axolotl: ['Axel', 'Pink', 'Gills', 'Fluffin'],
-  capybara: ['Chill', 'Buba', 'Relax', 'Zen'],
-  cactus: ['Spike', 'Prickle', 'Sandy', 'Thorn'],
-  robot: ['Beep', 'Byte', 'Circuit', 'Glitch'],
-  rabbit: ['Hoppy', 'Cotton', 'Fluff', 'Thumper'],
-  mushroom: ['Spore', 'Cap', 'Toad', 'Shroom'],
-  chonk: ['Chonks', 'Biggles', 'Round', 'Bubbles'],
-}
-
-const PERSONALITY_TRAITS: string[] = [
-  'curious', 'sleepy', 'energetic', 'grumpy', 'friendly',
-  'mischievous', 'wise', 'silly', 'calm', 'fiesty',
-]
-
-function generateFallbackName(species: string): string {
-  const prefixes = SPECIES_PREFIX[species] ?? ['Buddy', 'Pal', 'Friend']
-  const seed = hashString(companionUserId() + species)
-  return prefixes[seed % prefixes.length]!
-}
-
-function generateFallbackPersonality(stats: Record<StatName, number>): string {
-  // Pick personality based on highest stat
-  const entries = Object.entries(stats) as [StatName, number][]
-  const highest = entries.reduce((a, b) => (a[1] > b[1] ? a : b))
-  const seed = hashString(companionUserId() + highest[0])
-  return PERSONALITY_TRAITS[seed % PERSONALITY_TRAITS.length]!
-}
 
 function hashString(s: string): number {
   let h = 2166136261
@@ -76,9 +38,9 @@ function ensureCompanion(): Companion {
 
   // No companion exists - generate bones and create with fallback name/personality
   const userId = companionUserId()
-  const { bones } = roll(userId)
-  const name = generateFallbackName(bones.species)
-  const personality = generateFallbackPersonality(bones.stats)
+  const { bones, inspirationSeed } = roll(userId)
+  const name = generateFallbackName(bones.species, inspirationSeed)
+  const personality = generateFallbackPersonality(bones.stats, inspirationSeed)
 
   const companion: Companion = {
     ...bones,
@@ -210,6 +172,14 @@ server.setRequestHandler(
           properties: {},
         },
       },
+      {
+        name: 'buddy_rehatch',
+        description: 'Re-hatch your buddy companion to get a new species, rarity, and personality',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ],
   }),
 )
@@ -218,24 +188,30 @@ server.setRequestHandler(
   CallToolRequestSchema,
   async ({ params: { name, arguments: _args } }): Promise<CallToolResult> => {
     try {
-      const companion = ensureCompanion()
-
+      let companion: Companion
       let output: string
-      switch (name) {
-        case 'buddy_show':
-          output = formatBuddyShow(companion)
-          break
-        case 'buddy_pet':
-          output = formatBuddyPet(companion)
-          break
-        case 'buddy_stats':
-          output = formatBuddyStats(companion)
-          break
-        default:
-          return {
-            isError: true,
-            content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-          }
+
+      if (name === 'buddy_rehatch') {
+        companion = rehatchCompanion()
+        output = formatBuddyShow(companion)
+      } else {
+        companion = ensureCompanion()
+        switch (name) {
+          case 'buddy_show':
+            output = formatBuddyShow(companion)
+            break
+          case 'buddy_pet':
+            output = formatBuddyPet(companion)
+            break
+          case 'buddy_stats':
+            output = formatBuddyStats(companion)
+            break
+          default:
+            return {
+              isError: true,
+              content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+            }
+        }
       }
 
       return {

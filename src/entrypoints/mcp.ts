@@ -16,6 +16,10 @@ import {
   type ToolUseContext,
 } from '../Tool.js'
 import { getTools } from '../tools.js'
+import {
+  getCodeGraphToolDefinitions,
+  handleCodeGraphToolCall,
+} from '../mcp/codeGraphTools.js'
 import { createAbortController } from '../utils/abortController.js'
 import { createFileStateCacheWithSizeLimit } from '../utils/fileStateCache.js'
 import { logError } from '../utils/log.js'
@@ -59,39 +63,42 @@ export async function startMCPServer(
   server.setRequestHandler(
     ListToolsRequestSchema,
     async (): Promise<ListToolsResult> => {
-      // TODO: Also re-expose any MCP tools
       const toolPermissionContext = getEmptyToolPermissionContext()
       const tools = getTools(toolPermissionContext)
+      const extraTools = getCodeGraphToolDefinitions()
       return {
-        tools: await Promise.all(
-          tools.map(async tool => {
-            let outputSchema: ToolOutput | undefined
-            if (tool.outputSchema) {
-              const convertedSchema = zodToJsonSchema(tool.outputSchema)
-              // MCP SDK requires outputSchema to have type: "object" at root level
-              // Skip schemas with anyOf/oneOf at root (from z.union, z.discriminatedUnion, etc.)
-              // See: https://github.com/anthropics/claude-code/issues/8014
-              if (
-                typeof convertedSchema === 'object' &&
-                convertedSchema !== null &&
-                'type' in convertedSchema &&
-                convertedSchema.type === 'object'
-              ) {
-                outputSchema = convertedSchema as ToolOutput
+        tools: [
+          ...(await Promise.all(
+            tools.map(async tool => {
+              let outputSchema: ToolOutput | undefined
+              if (tool.outputSchema) {
+                const convertedSchema = zodToJsonSchema(tool.outputSchema)
+                // MCP SDK requires outputSchema to have type: "object" at root level
+                // Skip schemas with anyOf/oneOf at root (from z.union, z.discriminatedUnion, etc.)
+                // See: https://github.com/anthropics/claude-code/issues/8014
+                if (
+                  typeof convertedSchema === 'object' &&
+                  convertedSchema !== null &&
+                  'type' in convertedSchema &&
+                  convertedSchema.type === 'object'
+                ) {
+                  outputSchema = convertedSchema as ToolOutput
+                }
               }
-            }
-            return {
-              ...tool,
-              description: await tool.prompt({
-                getToolPermissionContext: async () => toolPermissionContext,
-                tools,
-                agents: [],
-              }),
-              inputSchema: zodToJsonSchema(tool.inputSchema) as ToolInput,
-              outputSchema,
-            }
-          }),
-        ),
+              return {
+                ...tool,
+                description: await tool.prompt({
+                  getToolPermissionContext: async () => toolPermissionContext,
+                  tools,
+                  agents: [],
+                }),
+                inputSchema: zodToJsonSchema(tool.inputSchema) as ToolInput,
+                outputSchema,
+              }
+            }),
+          )),
+          ...extraTools,
+        ],
       }
     },
   )
@@ -100,8 +107,11 @@ export async function startMCPServer(
     CallToolRequestSchema,
     async ({ params: { name, arguments: args } }): Promise<CallToolResult> => {
       const toolPermissionContext = getEmptyToolPermissionContext()
-      // TODO: Also re-expose any MCP tools
       const tools = getTools(toolPermissionContext)
+      const codeGraphResult = await handleCodeGraphToolCall(cwd, name, args)
+      if (codeGraphResult) {
+        return codeGraphResult
+      }
       const tool = findToolByName(tools, name)
       if (!tool) {
         throw new Error(`Tool ${name} not found`)

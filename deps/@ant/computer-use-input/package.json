@@ -1,0 +1,6 @@
+{
+  "name": "@ant/computer-use-input",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./js/index.js"
+}

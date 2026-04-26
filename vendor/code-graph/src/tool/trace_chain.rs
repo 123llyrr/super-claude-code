@@ -28,14 +28,10 @@ pub fn trace_chain(graph: &CodeGraph, from: &str, to: &str) -> ToolResult {
         };
     }
 
-    // Try all combinations of from/to matches to find any path
-    let mut out = String::new();
-    let mut found_any = false;
-
     for from_sym in &from_matches {
         for to_sym in &to_matches {
             if let Some(path) = graph.shortest_path(from_sym.id, to_sym.id) {
-                found_any = true;
+                let mut out = String::new();
                 out.push_str(&format!("Call chain from {}() to {}():\n\n", from, to));
                 for (i, &sym_id) in path.iter().enumerate() {
                     if let Some(node) = graph.node(sym_id) {
@@ -47,18 +43,19 @@ pub fn trace_chain(graph: &CodeGraph, from: &str, to: &str) -> ToolResult {
                 }
                 out.push('\n');
                 out.push_str("[SCOPE: The issue is in ONE of these functions. Read ONLY these files — do not explore outside this chain.]");
+                return ToolResult {
+                    call_id: String::new(),
+                    output: out,
+                    success: true,
+                };
             }
         }
     }
 
-    if !found_any {
-        out.push_str(&format!("No call path found between {}() and {}()", from, to));
-    }
-
     ToolResult {
         call_id: String::new(),
-        output: out,
-        success: found_any,
+        output: format!("No call path found between {}() and {}()", from, to),
+        success: false,
     }
 }
 

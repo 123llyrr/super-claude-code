@@ -48,6 +48,15 @@ const jobClassifierModule = feature('TEMPLATES')
 
 /* eslint-enable @typescript-eslint/no-require-imports */
 
+/** Whether we asked the user to confirm memory extraction in the previous turn */
+let memoryConfirmationPending = false
+
+/** Check if user message content indicates confirmation */
+function isMemoryConfirmation(userContent: string): boolean {
+  const confirmed = /^(yes|yep|yeah|ok|okay|sure|go ahead|confirm|save|i want|i'd like)/i.test(userContent.trim())
+  return confirmed
+}
+
 import type { QuerySource } from '../constants/querySource.js'
 import { executeAutoDream } from '../services/autoDream/autoDream.js'
 import { executePromptSuggestion } from '../services/PromptSuggestion/promptSuggestion.js'
@@ -143,13 +152,29 @@ export async function* handleStopHooks(
       !toolUseContext.agentId &&
       isExtractModeActive()
     ) {
-      // Fire-and-forget in both interactive and non-interactive. For -p/SDK,
-      // print.ts drains the in-flight promise after flushing the response
-      // but before gracefulShutdownSync (see drainPendingExtraction).
-      void extractMemoriesModule!.executeExtractMemories(
-        stopHookContext,
-        toolUseContext.appendSystemMessage,
-      )
+      // Check if user confirmed memory extraction from previous turn's prompt
+      if (memoryConfirmationPending) {
+        const lastUserMsg = messagesForQuery[messagesForQuery.length - 1]
+        if (lastUserMsg?.type === 'user' && isMemoryConfirmation(lastUserMsg.content)) {
+          // User confirmed — run extraction and clear flag
+          memoryConfirmationPending = false
+          void extractMemoriesModule!.executeExtractMemories(
+            stopHookContext,
+            toolUseContext.appendSystemMessage,
+          )
+        } else {
+          // User didn't confirm — clear flag and ask again next turn
+          memoryConfirmationPending = false
+        }
+      } else {
+        // Ask user for confirmation before extracting memories
+        memoryConfirmationPending = true
+        const confirmMsg = createUserMessage({
+          content: 'Shall I save memories from this session? (yes/no)',
+          isMeta: false,
+        })
+        yield confirmMsg
+      }
     }
     if (!toolUseContext.agentId) {
       void executeAutoDream(stopHookContext, toolUseContext.appendSystemMessage)

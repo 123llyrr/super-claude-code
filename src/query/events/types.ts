@@ -1,12 +1,14 @@
+import type { Message } from '../../types/message.js'
+
 // --- Agent lifecycle ---
 export type AgentEvent =
   | { type: 'agent_start' }
-  | { type: 'agent_end'; messages: unknown[] }
+  | { type: 'agent_end'; messages: Message[] }
 
 // --- Turn lifecycle ---
 export type TurnEvent =
   | { type: 'turn_start'; turnNumber: number }
-  | { type: 'turn_end'; turnNumber: number; message: unknown; toolResults: unknown[] }
+  | { type: 'turn_end'; turnNumber: number; message: Message; toolResults: Message[] }
 
 // --- Message streaming events ---
 export type MessageDelta =
@@ -15,9 +17,9 @@ export type MessageDelta =
   | { type: 'toolcall_delta'; delta: string; contentIndex: number }
 
 export type MessageEvent =
-  | { type: 'message_start'; message: unknown }
+  | { type: 'message_start'; message: Message }
   | { type: 'message_delta'; delta: MessageDelta }
-  | { type: 'message_end'; message: unknown }
+  | { type: 'message_end'; message: Message }
 
 // --- Tool execution events ---
 export interface ToolProgress {
@@ -42,6 +44,7 @@ export type QueryEvent = AgentEvent | TurnEvent | MessageEvent | ToolExecutionEv
 // --- Result type ---
 export interface QueryResult {
   type: 'success' | 'error'
-  message?: unknown
+  message?: Message
+  messages?: Message[]
   error?: string
 }

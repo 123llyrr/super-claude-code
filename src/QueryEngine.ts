@@ -6,6 +6,17 @@ import {
   getSessionId,
   isSessionPersistenceDisabled,
 } from 'src/bootstrap/state.js'
+import {
+  metacognitionCheckToolError,
+  metacognitionCheckUserChallenge,
+  metacognitionExpressCorrection,
+  metacognitionProposeCorrection,
+  metacognitionRecognizePattern,
+  metacognitionExpressStrategyAdjustment,
+  metacognitionProposeStrategyAdjustment,
+  metacognitionStoreInsight,
+  initMetacognition,
+} from 'src/metacognition/index.js'
 import type {
   PermissionMode,
   SDKCompactBoundaryMessage,
@@ -59,7 +70,11 @@ import {
 import { headlessProfilerCheckpoint } from './utils/headlessProfiler.js'
 import { registerStructuredOutputEnforcement } from './utils/hooks/hookHelpers.js'
 import { getInMemoryErrors } from './utils/log.js'
-import { countToolCalls, SYNTHETIC_MESSAGES } from './utils/messages.js'
+import {
+  countToolCalls,
+  SYNTHETIC_MESSAGES,
+  createAssistantMessage,
+} from './utils/messages.js'
 import {
   getMainLoopModel,
   parseUserSpecifiedModel,
@@ -196,6 +211,8 @@ export class QueryEngine {
   // many turns in SDK mode.
   private discoveredSkillNames = new Set<string>()
   private loadedNestedMemoryPaths = new Set<string>()
+  // Pending metacognition correction proposals to yield to user
+  private pendingCorrectionProposals: string[] = []
 
   constructor(config: QueryEngineConfig) {
     this.config = config
@@ -204,6 +221,8 @@ export class QueryEngine {
     this.permissionDenials = []
     this.readFileState = config.readFileCache
     this.totalUsage = EMPTY_USAGE
+    // Initialize metacognition module
+    initMetacognition()
   }
 
   async *submitMessage(
@@ -783,6 +802,57 @@ export class QueryEngine {
           break
         case 'user':
           this.mutableMessages.push(message)
+          // Metacognition: check if user is challenging the AI's previous response
+          const userContent =
+            typeof message.message.content === 'string'
+              ? message.message.content
+              : Array.isArray(message.message.content)
+                ? message.message.content
+                    .filter(b => b.type === 'text')
+                    .map(b => (b as { type: 'text'; text: string }).text)
+                    .join('\n')
+                : ''
+          const challengeError = metacognitionCheckUserChallenge(userContent)
+          if (challengeError) {
+            const proposal = metacognitionProposeCorrection(challengeError)
+            const correctionText = metacognitionExpressCorrection(proposal)
+            // Yield the correction proposal as an assistant message for confirmation
+            yield createAssistantMessage({ content: correctionText })
+          }
+          // Metacognition: check tool_result blocks for errors
+          if (Array.isArray(message.message.content)) {
+            for (const block of message.message.content) {
+              if (block.type === 'tool_result') {
+                const resultText =
+                  typeof block.content === 'string'
+                    ? block.content
+                    : Array.isArray(block.content)
+                      ? block.content
+                          .filter(c => c.type === 'text')
+                          .map(c => (c as { type: 'text'; text: string }).text)
+                          .join('\n')
+                      : ''
+                if (resultText.includes('<tool_use_error>') || block.is_error) {
+                  // Extract tool name from the error content
+                  const toolMatch = resultText.match(/<tool_use_error>Error: (No such tool|Permission denied|.*?)</)
+                  const toolName = toolMatch ? toolMatch[1] : 'unknown'
+                  const toolError = metacognitionCheckToolError(toolName, resultText)
+                  if (toolError) {
+                    const proposal = metacognitionProposeCorrection(toolError)
+                    const correctionText = metacognitionExpressCorrection(proposal)
+                    yield createAssistantMessage({ content: correctionText })
+                  }
+                }
+              }
+            }
+          }
+          // Metacognition: check for error patterns and suggest strategy adjustments
+          const pattern = metacognitionRecognizePattern()
+          if (pattern) {
+            const adjustment = metacognitionProposeStrategyAdjustment(pattern)
+            const suggestion = metacognitionExpressStrategyAdjustment(adjustment, pattern)
+            yield createAssistantMessage({ content: suggestion })
+          }
           yield* normalizeMessage(message)
           break
         case 'stream_event':

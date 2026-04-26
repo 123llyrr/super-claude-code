@@ -1,1 +1,3 @@
-preload = ["./preload.ts"]
+[install]
+# Map @ant/* packages to local deps directory
+scopes = { "@ant" = "deps/@ant" }

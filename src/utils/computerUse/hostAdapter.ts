@@ -111,16 +111,18 @@ export function getComputerUseHostAdapter(): ComputerUseHostAdapter {
   return cached
 }
 
-// Background detection flag — ensure swap only affects subsequent callers, not the first
+// Background detection flag — ensure swap only runs once
 let backgroundDetectionStarted = false
 
 /**
  * On Linux, use the factory for async detection of open-codex primary runtime.
  * If open-codex is primary, swap the executor in the background for FUTURE callers.
  * First caller always gets the initial adapter (linux-input fallback) to avoid race.
+ * Also respects getChicagoEnabled() — skip detection if Computer Use is disabled.
  */
 function startBackgroundExecutorSwap() {
   if (!isLinux || backgroundDetectionStarted) return
+  if (!getChicagoEnabled()) return // Computer Use disabled, skip detection
   backgroundDetectionStarted = true
 
   createExecutorAdapter()

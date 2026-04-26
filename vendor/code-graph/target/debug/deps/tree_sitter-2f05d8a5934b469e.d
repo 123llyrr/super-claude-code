@@ -1,0 +1,13 @@
+/home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/deps/tree_sitter-2f05d8a5934b469e.d: /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/lib.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/ffi.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/util.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/./README.md /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/./bindings.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/../src/parser.h /home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/build/tree-sitter-319ff25bfff68d50/out/stdlib-symbols.txt
+
+/home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/deps/libtree_sitter-2f05d8a5934b469e.rmeta: /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/lib.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/ffi.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/util.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/./README.md /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/./bindings.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/../src/parser.h /home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/build/tree-sitter-319ff25bfff68d50/out/stdlib-symbols.txt
+
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/lib.rs:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/ffi.rs:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/util.rs:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/./README.md:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/./bindings.rs:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-0.25.10/binding_rust/../src/parser.h:
+/home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/build/tree-sitter-319ff25bfff68d50/out/stdlib-symbols.txt:
+
+# env-dep:OUT_DIR=/home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/build/tree-sitter-319ff25bfff68d50/out

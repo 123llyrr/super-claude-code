@@ -54,6 +54,7 @@ export class StreamingToolExecutor {
     private readonly toolDefinitions: Tools,
     private readonly canUseTool: CanUseToolFn,
     toolUseContext: ToolUseContext,
+    private readonly onProgress?: (toolCallId: string, data: { type: string; [key: string]: unknown }) => void,
   ) {
     this.toolUseContext = toolUseContext
     this.siblingAbortController = createChildAbortController(
@@ -367,6 +368,8 @@ export class StreamingToolExecutor {
           // Progress messages go to pendingProgress for immediate yielding
           if (update.message.type === 'progress') {
             tool.pendingProgress.push(update.message)
+            // Emit progress via onProgress callback (for QueryEvent integration)
+            this.onProgress?.(tool.id, update.message.data as { type: string; [key: string]: unknown })
             // Signal that progress is available
             if (this.progressAvailableResolve) {
               this.progressAvailableResolve()

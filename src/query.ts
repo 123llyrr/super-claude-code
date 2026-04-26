@@ -1727,3 +1727,5 @@ async function* queryLoop(
     state = next
   } // while (true)
 }
+
+export { queryEvent } from './query/eventQuery.js'

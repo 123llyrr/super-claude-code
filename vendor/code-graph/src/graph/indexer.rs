@@ -32,13 +32,27 @@ const INDEXED_EXTENSIONS: &[&str] = &[
     "rs", "py", "js", "ts", "tsx", "go", "java", "c", "cpp", "vue",
 ];
 
+/// Directory names that should never be indexed as source roots.
+const SKIPPED_DIR_NAMES: &[&str] = &[
+    ".git",
+    ".worktrees",
+    "node_modules",
+    "target",
+    "deps",
+    ".next",
+    ".nuxt",
+    ".svelte-kit",
+    "dist",
+    "build",
+    "coverage",
+];
+
 /// Background indexer that walks a project directory, parses source files
 /// with tree-sitter, extracts symbols and call edges, and populates a
 /// shared `CodeGraph`.
 pub struct GraphIndexer {
     pub graph: Arc<RwLock<CodeGraph>>,
     project_dir: Arc<Mutex<PathBuf>>,
-    parser: Parser,
 }
 
 impl GraphIndexer {
@@ -47,7 +61,6 @@ impl GraphIndexer {
         Self {
             graph,
             project_dir: Arc::new(Mutex::new(project_dir)),
-            parser: Parser::new(),
         }
     }
 
@@ -106,12 +119,45 @@ impl GraphIndexer {
         // Read lock released here.
 
         // Parse dirty files OUTSIDE the lock (CPU-intensive, no graph access needed).
-        let mut all_results: Vec<(PathBuf, u64, FileParseResult)> = Vec::new();
-        for (path, mtime) in dirty_files {
-            if let Some(result) = self.parse_file(&path) {
-                all_results.push((path, mtime, result));
+        let worker_count = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .min(dirty_files.len().max(1))
+            .min(8);
+
+        let all_results: Vec<(PathBuf, u64, FileParseResult)> = if worker_count <= 1 {
+            dirty_files
+                .into_iter()
+                .filter_map(|(path, mtime)| parse_file_at_path(&path).map(|result| (path, mtime, result)))
+                .collect()
+        } else {
+            let chunk_size = dirty_files.len().div_ceil(worker_count);
+            let workers: Vec<_> = dirty_files
+                .chunks(chunk_size)
+                .map(|chunk| {
+                    let chunk = chunk.to_vec();
+                    std::thread::spawn(move || {
+                        chunk.into_iter()
+                            .filter_map(|(path, mtime)| parse_file_at_path(&path).map(|result| (path, mtime, result)))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+
+            let mut results = Vec::new();
+            for worker in workers {
+                if let Ok(mut chunk_results) = worker.join() {
+                    results.append(&mut chunk_results);
+                }
             }
-        }
+            results
+        };
+
+        eprintln!(
+            "[code-graph] parsed {} dirty files with {} workers",
+            all_results.len(),
+            worker_count
+        );
 
         if deleted.is_empty() && all_results.is_empty() {
             return; // Nothing to update
@@ -175,7 +221,7 @@ impl GraphIndexer {
             }
         };
 
-        let result = match self.parse_file(path) {
+        let result = match parse_file_at_path(path) {
             Some(r) => r,
             None => return,
         };
@@ -222,184 +268,181 @@ impl GraphIndexer {
     fn collect_files(&self) -> Vec<(PathBuf, u64)> {
         collect_files_sync(&self.get_project_dir())
     }
+}
 
-    /// Parse a single file: extract symbols and raw calls.
-    fn parse_file(&mut self, path: &Path) -> Option<FileParseResult> {
-        let source = std::fs::read_to_string(path).ok()?;
-        let lang = LanguageRegistry::detect(path)?;
+/// Parse a single file: extract symbols and raw calls.
+fn parse_file_at_path(path: &Path) -> Option<FileParseResult> {
+    let source = std::fs::read_to_string(path).ok()?;
+    let lang = LanguageRegistry::detect(path)?;
 
-        self.parser.set_language(&lang.grammar()).ok()?;
-        let tree = self.parser.parse(source.as_bytes(), None)?;
+    let mut parser = Parser::new();
+    parser.set_language(&lang.grammar()).ok()?;
+    let tree = parser.parse(source.as_bytes(), None)?;
 
-        let symbols = self.extract_symbols(path, &source, lang, &tree);
-        let raw_calls = self.extract_calls(path, &source, lang, &tree, &symbols);
+    let symbols = extract_symbols(path, &source, lang, &tree);
+    let raw_calls = extract_calls(&source, lang, &tree, &symbols);
 
-        Some(FileParseResult {
-            symbols,
-            raw_calls,
-        })
-    }
+    Some(FileParseResult { symbols, raw_calls })
+}
 
-    /// Extract symbol definitions from a parsed tree using the language's symbols_query.
-    fn extract_symbols(
-        &self,
-        path: &Path,
-        source: &str,
-        lang: Lang,
-        tree: &tree_sitter::Tree,
-    ) -> Vec<SymbolNode> {
-        let query_src = lang.symbols_query();
-        let query = match Query::new(&lang.grammar(), query_src) {
-            Ok(q) => q,
-            Err(_) => return Vec::new(),
+pub fn list_symbols_in_file(path: &Path) -> Vec<SymbolNode> {
+    parse_file_at_path(path)
+        .map(|result| result.symbols)
+        .unwrap_or_default()
+}
+
+/// Extract symbol definitions from a parsed tree using the language's symbols_query.
+fn extract_symbols(
+    path: &Path,
+    source: &str,
+    lang: Lang,
+    tree: &tree_sitter::Tree,
+) -> Vec<SymbolNode> {
+    let query_src = lang.symbols_query();
+    let query = match Query::new(&lang.grammar(), query_src) {
+        Ok(q) => q,
+        Err(_) => return Vec::new(),
+    };
+
+    let def_idx = match query.capture_index_for_name("definition") {
+        Some(i) => i,
+        None => return Vec::new(),
+    };
+    let name_idx = match query.capture_index_for_name("name") {
+        Some(i) => i,
+        None => return Vec::new(),
+    };
+
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+    let mut symbols = Vec::new();
+    let mut seen_ranges: HashSet<(usize, usize)> = HashSet::new();
+    let path_buf = path.to_path_buf();
+
+    loop {
+        matches.advance();
+        let m = match matches.get() {
+            Some(m) => m,
+            None => break,
         };
 
-        let def_idx = match query.capture_index_for_name("definition") {
-            Some(i) => i,
-            None => return Vec::new(),
-        };
-        let name_idx = match query.capture_index_for_name("name") {
-            Some(i) => i,
-            None => return Vec::new(),
-        };
+        let mut sym_name: Option<String> = None;
+        let mut def_start_line = 0usize;
+        let mut def_end_line = 0usize;
+        let mut def_start_byte = 0usize;
+        let mut def_end_byte = 0usize;
+        let mut ts_kind = "";
+        let mut has_def = false;
 
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
-
-        let mut symbols = Vec::new();
-        let mut seen_ranges: HashSet<(usize, usize)> = HashSet::new();
-        let path_buf = path.to_path_buf();
-
-        loop {
-            matches.advance();
-            let m = match matches.get() {
-                Some(m) => m,
-                None => break,
-            };
-
-            let mut sym_name: Option<String> = None;
-            let mut def_start_line = 0usize;
-            let mut def_end_line = 0usize;
-            let mut def_start_byte = 0usize;
-            let mut def_end_byte = 0usize;
-            let mut ts_kind = "";
-            let mut has_def = false;
-
-            for capture in m.captures {
-                if capture.index == name_idx {
-                    sym_name = Some(
-                        source[capture.node.start_byte()..capture.node.end_byte()].to_string(),
-                    );
-                }
-                if capture.index == def_idx {
-                    def_start_byte = capture.node.start_byte();
-                    def_end_byte = capture.node.end_byte();
-                    def_start_line = capture.node.start_position().row + 1; // 1-indexed
-                    def_end_line = capture.node.end_position().row + 1;
-                    ts_kind = capture.node.kind();
-                    has_def = true;
-                }
+        for capture in m.captures {
+            if capture.index == name_idx {
+                sym_name = Some(
+                    source[capture.node.start_byte()..capture.node.end_byte()].to_string(),
+                );
             }
-
-            if let (Some(name), true) = (sym_name, has_def) {
-                let range = (def_start_byte, def_end_byte);
-                if seen_ranges.contains(&range) {
-                    continue;
-                }
-                seen_ranges.insert(range);
-
-                let id = CodeGraph::make_id(&path_buf, &name, def_start_line);
-                let kind = classify_symbol_kind(ts_kind);
-
-                symbols.push(SymbolNode {
-                    id,
-                    name,
-                    kind,
-                    visibility: Visibility::Unknown,
-                    file: path_buf.clone(),
-                    start_line: def_start_line,
-                    end_line: def_end_line,
-                    signature: None,
-                });
+            if capture.index == def_idx {
+                def_start_byte = capture.node.start_byte();
+                def_end_byte = capture.node.end_byte();
+                def_start_line = capture.node.start_position().row + 1;
+                def_end_line = capture.node.end_position().row + 1;
+                ts_kind = capture.node.kind();
+                has_def = true;
             }
         }
 
-        symbols
+        if let (Some(name), true) = (sym_name, has_def) {
+            let range = (def_start_byte, def_end_byte);
+            if seen_ranges.contains(&range) {
+                continue;
+            }
+            seen_ranges.insert(range);
+
+            let id = CodeGraph::make_id(&path_buf, &name, def_start_line);
+            let kind = classify_symbol_kind(ts_kind);
+
+            symbols.push(SymbolNode {
+                id,
+                name,
+                kind,
+                visibility: Visibility::Unknown,
+                file: path_buf.clone(),
+                start_line: def_start_line,
+                end_line: def_end_line,
+                signature: None,
+            });
+        }
     }
 
-    /// Extract raw call edges from a parsed tree using the language's calls_query.
-    fn extract_calls(
-        &self,
-        _path: &Path,
-        source: &str,
-        lang: Lang,
-        tree: &tree_sitter::Tree,
-        symbols: &[SymbolNode],
-    ) -> Vec<RawCall> {
-        let query_src = match lang.calls_query() {
-            Some(q) => q,
-            None => return Vec::new(),
+    symbols
+}
+
+/// Extract raw call edges from a parsed tree using the language's calls_query.
+fn extract_calls(
+    source: &str,
+    lang: Lang,
+    tree: &tree_sitter::Tree,
+    symbols: &[SymbolNode],
+) -> Vec<RawCall> {
+    let query_src = match lang.calls_query() {
+        Some(q) => q,
+        None => return Vec::new(),
+    };
+
+    let query = match Query::new(&lang.grammar(), query_src) {
+        Ok(q) => q,
+        Err(_) => return Vec::new(),
+    };
+
+    let callee_idx = match query.capture_index_for_name("callee") {
+        Some(i) => i,
+        None => return Vec::new(),
+    };
+
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+    let mut raw_calls = Vec::new();
+
+    loop {
+        matches.advance();
+        let m = match matches.get() {
+            Some(m) => m,
+            None => break,
         };
 
-        let query = match Query::new(&lang.grammar(), query_src) {
-            Ok(q) => q,
-            Err(_) => return Vec::new(),
-        };
+        for capture in m.captures {
+            if capture.index == callee_idx {
+                let callee_name =
+                    source[capture.node.start_byte()..capture.node.end_byte()].to_string();
+                let call_line = capture.node.start_position().row + 1;
 
-        let callee_idx = match query.capture_index_for_name("callee") {
-            Some(i) => i,
-            None => return Vec::new(),
-        };
+                let caller_name = symbols
+                    .iter()
+                    .filter(|s| {
+                        matches!(s.kind, SymbolKind::Function | SymbolKind::Method)
+                            && s.start_line <= call_line
+                            && call_line <= s.end_line
+                    })
+                    .last()
+                    .map(|s| s.name.clone());
 
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
-
-        let mut raw_calls = Vec::new();
-
-        loop {
-            matches.advance();
-            let m = match matches.get() {
-                Some(m) => m,
-                None => break,
-            };
-
-            for capture in m.captures {
-                if capture.index == callee_idx {
-                    let callee_name =
-                        source[capture.node.start_byte()..capture.node.end_byte()].to_string();
-                    let call_line = capture.node.start_position().row + 1; // 1-indexed
-
-                    // Find enclosing function
-                    let caller_name = symbols
-                        .iter()
-                        .filter(|s| {
-                            matches!(
-                                s.kind,
-                                SymbolKind::Function | SymbolKind::Method
-                            ) && s.start_line <= call_line
-                                && call_line <= s.end_line
-                        })
-                        .last()
-                        .map(|s| s.name.clone());
-
-                    if let Some(caller_name) = caller_name {
-                        // Skip self-calls
-                        if caller_name == callee_name {
-                            continue;
-                        }
-
-                        raw_calls.push(RawCall {
-                            caller_name,
-                            callee_name,
-                            line: call_line,
-                        });
+                if let Some(caller_name) = caller_name {
+                    if caller_name == callee_name {
+                        continue;
                     }
+
+                    raw_calls.push(RawCall {
+                        caller_name,
+                        callee_name,
+                        line: call_line,
+                    });
                 }
             }
         }
-
-        raw_calls
     }
+
+    raw_calls
 }
 
 /// Map tree-sitter node kind strings to `SymbolKind`.
@@ -461,10 +504,12 @@ fn looks_like_project(dir: &Path) -> bool {
 /// can own it cleanly (taking only `&Path`, not `&self`).
 fn collect_files_sync(project_dir: &Path) -> Vec<(PathBuf, u64)> {
     let mut files = Vec::new();
+    let project_dir = project_dir.to_path_buf();
 
-    let walker = WalkBuilder::new(project_dir)
+    let walker = WalkBuilder::new(&project_dir)
         .hidden(true)
         .git_ignore(true)
+        .filter_entry(move |entry| should_index_entry(entry.path(), &project_dir))
         .build();
 
     for entry in walker {
@@ -503,4 +548,20 @@ fn collect_files_sync(project_dir: &Path) -> Vec<(PathBuf, u64)> {
     }
 
     files
+}
+
+fn should_index_entry(path: &Path, project_dir: &Path) -> bool {
+    let relative = match path.strip_prefix(project_dir) {
+        Ok(relative) => relative,
+        Err(_) => return true,
+    };
+
+    for component in relative.components() {
+        let name = component.as_os_str().to_string_lossy();
+        if SKIPPED_DIR_NAMES.iter().any(|dir| *dir == name) {
+            return false;
+        }
+    }
+
+    true
 }

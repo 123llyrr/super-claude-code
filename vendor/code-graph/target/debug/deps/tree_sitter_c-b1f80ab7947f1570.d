@@ -1,0 +1,8 @@
+/home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/deps/tree_sitter_c-b1f80ab7947f1570.d: /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/lib.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../src/node-types.json /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../queries/highlights.scm /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../queries/tags.scm
+
+/home/liuxue/2号员工/Super-Claude-Code/vendor/code-graph/target/debug/deps/libtree_sitter_c-b1f80ab7947f1570.rmeta: /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/lib.rs /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../src/node-types.json /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../queries/highlights.scm /home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../queries/tags.scm
+
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/lib.rs:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../src/node-types.json:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../queries/highlights.scm:
+/home/liuxue/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tree-sitter-c-0.24.2/bindings/rust/../../queries/tags.scm:

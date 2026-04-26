@@ -1,14 +1,15 @@
 {
-  "name": "claude-code-local",
+  "name": "super-claude-code",
   "version": "999.0.0-local",
   "private": true,
   "type": "module",
   "bin": {
-    "claude-haha": "./bin/claude-haha"
+    "super-claude-code": "./bin/super-claude-code"
   },
   "scripts": {
-    "claude-haha": "bun run ./bin/claude-haha",
-    "start": "bun run ./bin/claude-haha"
+    "super-claude-code": "bun run ./bin/super-claude-code",
+    "start": "bun run ./bin/super-claude-code",
+    "test:code-graph": "bun run ./src/mcp/codeGraphTools.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "^0.0.44",
@@ -73,5 +74,8 @@
     "xss": "^1.0.15",
     "yaml": "^2.8.3",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }

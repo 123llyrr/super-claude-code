@@ -67,6 +67,25 @@ impl Lang {
         }
     }
 
+    /// The tree-sitter query for extracting ALL identifier references (not just calls).
+    /// This enables find_references to work for types, constants, interfaces, etc.
+    /// Returns identifiers that are uses (references), not definitions.
+    pub fn refs_query(&self) -> Option<&'static str> {
+        match self {
+            // Match any identifier that is a child of a reference context
+            // Excludes identifiers that are definitions (function names, type names, etc.)
+            Lang::Rust => Some(include_str!("../graph/queries/rust_refs.scm")),
+            Lang::Python => Some(include_str!("../graph/queries/python_refs.scm")),
+            Lang::JavaScript | Lang::TypeScript | Lang::Tsx | Lang::Vue => {
+                Some(include_str!("../graph/queries/javascript_refs.scm"))
+            }
+            Lang::Java => Some(include_str!("../graph/queries/java_refs.scm")),
+            Lang::Go => Some(include_str!("../graph/queries/go_refs.scm")),
+            Lang::C | Lang::Cpp => None,
+            Lang::Html => None,
+        }
+    }
+
     /// Whether this language is a Vue SFC (needs dual parsing).
     pub fn is_vue(&self) -> bool {
         matches!(self, Lang::Vue)

@@ -1,4 +1,4 @@
-import { getGlobalConfig } from '../utils/config.js'
+import { getGlobalConfig, saveGlobalConfig } from '../utils/config.js'
 import {
   type Companion,
   type CompanionBones,
@@ -11,6 +11,48 @@ import {
   STAT_NAMES,
   type StatName,
 } from './types.js'
+
+// ── Fallback name/personality generation ──────────────────────────
+
+const SPECIES_PREFIX: Record<string, string[]> = {
+  duck: ['Quackers', 'Ducky', 'Waddle', 'Puddles'],
+  goose: ['Gus', 'Grace', 'Honker', 'Serena'],
+  blob: ['Blobby', 'Gloop', 'Puddles', 'Goober'],
+  cat: ['Whiskers', 'Mittens', 'Luna', 'Shadow'],
+  dragon: ['Spark', 'Ember', 'Scales', 'Flame'],
+  octopus: ['Ink', 'Splash', 'Tentie', 'Coral'],
+  owl: ['Hoot', 'Sage', 'Night', 'Misty'],
+  penguin: ['Waddle', 'Slippy', 'Frost', 'Pebble'],
+  turtle: ['Shelly', 'Tank', 'Shell', 'Slowpoke'],
+  snail: ['Shiny', 'Glide', 'Squish', 'Dewdrop'],
+  ghost: ['Spooky', 'Boo', 'Misty', 'Phantom'],
+  axolotl: ['Axel', 'Pink', 'Gills', 'Fluffin'],
+  capybara: ['Chill', 'Buba', 'Relax', 'Zen'],
+  cactus: ['Spike', 'Prickle', 'Sandy', 'Thorn'],
+  robot: ['Beep', 'Byte', 'Circuit', 'Glitch'],
+  rabbit: ['Hoppy', 'Cotton', 'Fluff', 'Thumper'],
+  mushroom: ['Spore', 'Cap', 'Toad', 'Shroom'],
+  chonk: ['Chonks', 'Biggles', 'Round', 'Bubbles'],
+}
+
+const PERSONALITY_TRAITS: string[] = [
+  'curious', 'sleepy', 'energetic', 'grumpy', 'friendly',
+  'mischievous', 'wise', 'silly', 'calm', 'fiesty',
+]
+
+export function generateFallbackName(species: string, seed: number): string {
+  const prefixes = SPECIES_PREFIX[species] ?? ['Buddy', 'Pal', 'Friend']
+  return prefixes[seed % prefixes.length]!
+}
+
+export function generateFallbackPersonality(
+  stats: Record<StatName, number>,
+  seed: number,
+): string {
+  const entries = Object.entries(stats) as [StatName, number][]
+  const highest = entries.reduce((a, b) => (a[1] > b[1] ? a : b))
+  return PERSONALITY_TRAITS[(seed + highest[1]) % PERSONALITY_TRAITS.length]!
+}
 
 // Mulberry32 — tiny seeded PRNG, good enough for picking ducks
 function mulberry32(seed: number): () => number {
@@ -104,8 +146,8 @@ function rollFrom(rng: () => number): Roll {
 // Called from three hot paths (500ms sprite tick, per-keystroke PromptInput,
 // per-turn observer) with the same userId → cache the deterministic result.
 let rollCache: { key: string; value: Roll } | undefined
-export function roll(userId: string): Roll {
-  const key = userId + SALT
+export function roll(userId: string, nonce = 0): Roll {
+  const key = `${userId}${SALT}${nonce}`
   if (rollCache?.key === key) return rollCache.value
   const value = rollFrom(mulberry32(hashString(key)))
   rollCache = { key, value }
@@ -127,7 +169,41 @@ export function companionUserId(): string {
 export function getCompanion(): Companion | undefined {
   const stored = getGlobalConfig().companion
   if (!stored) return undefined
-  const { bones } = roll(companionUserId())
+  const nonce = stored.rehatchCount ?? 0
+  const { bones } = roll(companionUserId(), nonce)
   // bones last so stale bones fields in old-format configs get overridden
   return { ...stored, ...bones }
+}
+
+// Re-hatch companion: increment rehatchCount → regenerate bones + name + personality
+export function rehatchCompanion(): Companion {
+  const stored = getGlobalConfig().companion
+  const newCount = (stored?.rehatchCount ?? 0) + 1
+
+  const userId = companionUserId()
+  // Clear cache so roll uses the new nonce
+  rollCache = undefined
+  const { bones, inspirationSeed } = roll(userId, newCount)
+
+  const name = generateFallbackName(bones.species, inspirationSeed)
+  const personality = generateFallbackPersonality(bones.stats, inspirationSeed)
+
+  const companion: Companion = {
+    ...bones,
+    name,
+    personality,
+    hatchedAt: Date.now(),
+  }
+
+  saveGlobalConfig(current => ({
+    ...current,
+    companion: {
+      name: companion.name,
+      personality: companion.personality,
+      hatchedAt: companion.hatchedAt,
+      rehatchCount: newCount,
+    },
+  }))
+
+  return companion
 }

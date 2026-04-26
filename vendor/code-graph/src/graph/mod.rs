@@ -67,6 +67,7 @@ pub struct Edge {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeGraph {
     pub nodes: HashMap<SymbolId, SymbolNode>,
+    pub name_index: HashMap<String, Vec<SymbolId>>,
     pub edges_out: HashMap<SymbolId, Vec<Edge>>,
     pub edges_in: HashMap<SymbolId, Vec<Edge>>,
     pub file_symbols: HashMap<PathBuf, Vec<SymbolId>>,
@@ -77,6 +78,7 @@ impl CodeGraph {
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
+            name_index: HashMap::new(),
             edges_out: HashMap::new(),
             edges_in: HashMap::new(),
             file_symbols: HashMap::new(),
@@ -95,7 +97,9 @@ impl CodeGraph {
     pub fn add_symbol(&mut self, node: SymbolNode) {
         let id = node.id;
         let file = node.file.clone();
+        let name = node.name.clone();
         self.nodes.insert(id, node);
+        self.name_index.entry(name).or_default().push(id);
         self.file_symbols.entry(file).or_default().push(id);
     }
 
@@ -133,7 +137,14 @@ impl CodeGraph {
             None => return,
         };
         for &id in &symbol_ids {
-            self.nodes.remove(&id);
+            if let Some(node) = self.nodes.remove(&id) {
+                if let Some(ids) = self.name_index.get_mut(&node.name) {
+                    ids.retain(|existing| *existing != id);
+                    if ids.is_empty() {
+                        self.name_index.remove(&node.name);
+                    }
+                }
+            }
             if let Some(out_edges) = self.edges_out.remove(&id) {
                 for edge in &out_edges {
                     if let Some(in_list) = self.edges_in.get_mut(&edge.to) {
@@ -159,7 +170,12 @@ impl CodeGraph {
     }
 
     pub fn find_by_name(&self, name: &str) -> Vec<&SymbolNode> {
-        self.nodes.values().filter(|n| n.name == name).collect()
+        self.name_index
+            .get(name)
+            .into_iter()
+            .flat_map(|ids| ids.iter())
+            .filter_map(|id| self.nodes.get(id))
+            .collect()
     }
 
     pub fn node_count(&self) -> usize {

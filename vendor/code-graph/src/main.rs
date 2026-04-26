@@ -8,7 +8,7 @@ mod graph;
 mod semantic;
 mod tool;
 
-use graph::indexer::GraphIndexer;
+use graph::indexer::{list_symbols_in_file, GraphIndexer};
 use graph::{resolve, CodeGraph};
 
 /// Global graph indexer, lazily initialized.
@@ -47,6 +47,7 @@ pub struct QueryParams {
     pub file_path: Option<String>,
     pub symbol_id: Option<u64>,
     pub name: Option<String>,
+    pub depth: Option<usize>,
     pub to: Option<String>, // for trace_chain
 }
 
@@ -87,26 +88,23 @@ impl Response {
 async fn handle_init(project_dir: String, id: u64) -> Response {
     eprintln!("[code-graph] init project_dir={}", project_dir);
 
-    // Set project directory and spawn background indexing task
+    // Set project directory and perform a full index before replying so the
+    // first client request can use the graph immediately.
     let indexer = Arc::clone(&INDEXER);
     {
         let mut indexer_mut = indexer.write();
         indexer_mut.set_project_dir(PathBuf::from(&project_dir));
+        indexer_mut.index_all();
     }
 
-    // Spawn background indexing task
-    tokio::spawn(async move {
-        let mut indexer = indexer.write();
-        indexer.index_all();
-    });
-
-    // Return immediately — indexing happens in background
+    let indexer = INDEXER.read();
+    let graph = indexer.graph.read();
     Response::success(
         id,
         serde_json::json!({
-            "ready": false,
-            "node_count": 0,
-            "file_count": 0,
+            "ready": graph.is_ready(),
+            "node_count": graph.node_count(),
+            "file_count": graph.file_count(),
         }),
     )
 }
@@ -147,6 +145,28 @@ async fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
             Response::success(id, serde_json::json!({ "symbols": symbols }))
         }
 
+        "list_symbols_fast" => {
+            let file_path = match &params.file_path {
+                Some(p) => PathBuf::from(p),
+                None => {
+                    return Response::error(id, "list_symbols_fast requires file_path");
+                }
+            };
+            let symbols = list_symbols_in_file(&file_path)
+                .into_iter()
+                .map(|n| {
+                    serde_json::json!({
+                        "name": n.name,
+                        "kind": format!("{:?}", n.kind),
+                        "start_line": n.start_line,
+                        "end_line": n.end_line,
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            Response::success(id, serde_json::json!({ "symbols": symbols }))
+        }
+
         "node" => {
             let symbol_id = match params.symbol_id {
                 Some(id) => id,
@@ -175,21 +195,11 @@ async fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(n) => n.as_str(),
                 None => return Response::error(id, "find_by_name requires name"),
             };
-            let results: Vec<serde_json::Value> = graph
-                .find_by_name(name)
-                .iter()
-                .map(|n| {
-                    serde_json::json!({
-                        "id": n.id,
-                        "name": n.name,
-                        "kind": format!("{:?}", n.kind),
-                        "file": n.file,
-                        "start_line": n.start_line,
-                        "end_line": n.end_line,
-                    })
-                })
-                .collect();
-            Response::success(id, serde_json::json!({ "symbols": results }))
+            let file_path = params.file_path.as_deref().unwrap_or("");
+            let result = tool::find_references::find_references(&graph, name, file_path);
+            let parsed: serde_json::Value =
+                serde_json::from_str(&result.output).unwrap_or(serde_json::json!({ "references": [] }));
+            Response::success(id, parsed)
         }
 
         "callers" => {
@@ -243,17 +253,27 @@ async fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(n) => n.as_str(),
                 None => return Response::error(id, "trace_callers requires 'symbol' param"),
             };
-            let depth = params
-                .file_path
-                .as_ref()
-                .and_then(|p| p.parse().ok())
-                .unwrap_or(3);
+            let depth = params.depth.unwrap_or(3);
             let candidates = graph.find_by_name(symbol);
             let sym_id = match candidates.first() {
                 Some(n) => n.id,
                 None => return Response::success(id, serde_json::json!({ "callers": [] })),
             };
-            let result: Vec<(u64, usize)> = graph.trace_callers(sym_id, depth);
+            let result: Vec<serde_json::Value> = graph
+                .trace_callers(sym_id, depth)
+                .iter()
+                .filter_map(|(node_id, depth)| {
+                    graph.node(*node_id).map(|node| {
+                        serde_json::json!({
+                            "name": node.name,
+                            "kind": format!("{:?}", node.kind),
+                            "file": node.file,
+                            "line": node.start_line,
+                            "depth": depth,
+                        })
+                    })
+                })
+                .collect();
             Response::success(id, serde_json::json!({ "callers": result }))
         }
 
@@ -262,17 +282,27 @@ async fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(n) => n.as_str(),
                 None => return Response::error(id, "trace_callees requires 'symbol' param"),
             };
-            let depth = params
-                .file_path
-                .as_ref()
-                .and_then(|p| p.parse().ok())
-                .unwrap_or(3);
+            let depth = params.depth.unwrap_or(3);
             let candidates = graph.find_by_name(symbol);
             let sym_id = match candidates.first() {
                 Some(n) => n.id,
                 None => return Response::success(id, serde_json::json!({ "callees": [] })),
             };
-            let result: Vec<(u64, usize)> = graph.trace_callees(sym_id, depth);
+            let result: Vec<serde_json::Value> = graph
+                .trace_callees(sym_id, depth)
+                .iter()
+                .filter_map(|(node_id, depth)| {
+                    graph.node(*node_id).map(|node| {
+                        serde_json::json!({
+                            "name": node.name,
+                            "kind": format!("{:?}", node.kind),
+                            "file": node.file,
+                            "line": node.start_line,
+                            "depth": depth,
+                        })
+                    })
+                })
+                .collect();
             Response::success(id, serde_json::json!({ "callees": result }))
         }
 
@@ -294,11 +324,7 @@ async fn handle_query(method: &str, params: &QueryParams, id: u64) -> Response {
                 Some(p) => p.as_str(),
                 None => return Response::error(id, "file_deps requires file_path"),
             };
-            let depth = params
-                .name
-                .as_ref()
-                .and_then(|n| n.parse().ok())
-                .unwrap_or(3);
+            let depth = params.depth.unwrap_or(3);
             let result = tool::file_deps::file_deps(&graph, file_path, depth);
             // Parse the JSON output string back into structured data
             let parsed: serde_json::Value =
