@@ -33,24 +33,21 @@ export interface OpenCodexElement {
 // ── OpenCodexRuntime ─────────────────────────────────────────────────────────
 
 export class OpenCodexRuntime {
-  private available: boolean = false
   private readonly binaryName = 'open-computer-use'
 
   /**
    * Checks if the `open-computer-use` binary is available and functional.
-   * Sets internal `this.available` flag on success.
    */
   async checkAvailability(): Promise<boolean> {
     // Check if binary exists
     const { code: whichCode } = await execFileNoThrow(
       'which',
       [this.binaryName],
-      { useCwd: false },
+      { useCwd: false, timeout: 3000 },
     )
 
     if (whichCode !== 0) {
       logForDebugging(`OpenCodexRuntime: ${this.binaryName} not found in PATH`)
-      this.available = false
       return false
     }
 
@@ -59,18 +56,16 @@ export class OpenCodexRuntime {
       await execFileNoThrow(
         this.binaryName,
         ['doctor'],
-        { useCwd: false },
+        { useCwd: false, timeout: 3000 },
       )
 
     if (doctorCode !== 0) {
       logForDebugging(
         `OpenCodexRuntime: ${this.binaryName} doctor failed: ${doctorStderr || doctorStdout}`,
       )
-      this.available = false
       return false
     }
 
-    this.available = true
     logForDebugging(`OpenCodexRuntime: ${this.binaryName} is available`)
     return true
   }
@@ -90,7 +85,7 @@ export class OpenCodexRuntime {
     const { code, stdout, stderr } = await execFileNoThrow(
       this.binaryName,
       ['call', tool, '--args', argsJson],
-      { useCwd: false },
+      { useCwd: false, timeout: 3000 },
     )
 
     if (code !== 0) {
@@ -148,7 +143,7 @@ export class OpenCodexRuntime {
    */
   async scroll(
     app: string,
-    elementIndex: string,
+    elementIndex: number,
     direction: string,
     pages: number,
   ): Promise<void> {
@@ -196,7 +191,7 @@ export class OpenCodexRuntime {
   /**
    * Sets the value of an element (e.g., text input).
    */
-  async setValue(app: string, elementIndex: string, value: string): Promise<void> {
+  async setValue(app: string, elementIndex: number, value: string): Promise<void> {
     await this.callTool('set_value', {
       app,
       element_index: elementIndex,
@@ -209,7 +204,7 @@ export class OpenCodexRuntime {
    */
   async performSecondaryAction(
     app: string,
-    elementIndex: string,
+    elementIndex: number,
     action: string,
   ): Promise<void> {
     await this.callTool('perform_secondary_action', {
