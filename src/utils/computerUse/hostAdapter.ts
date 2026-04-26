@@ -7,6 +7,7 @@ import { logForDebugging } from '../debug.js'
 import { isBinaryInstalled } from '../binaryCheck.js'
 import { COMPUTER_USE_MCP_SERVER_NAME } from './common.js'
 import { createCliExecutor, createLinuxExecutor } from './executor.js'
+import { createExecutorAdapter } from './executorFactory.js'
 import { getChicagoEnabled, getChicagoSubGates } from './gates.js'
 
 class DebugLogger implements Logger {
@@ -28,6 +29,7 @@ class DebugLogger implements Logger {
 }
 
 let cached: ComputerUseHostAdapter | undefined
+const isLinux = process.platform === 'linux'
 
 // Lazy import for macOS-only modules (throws on non-darwin)
 function requireComputerUseSwift() {
@@ -54,8 +56,6 @@ function getComputerUseSwift() {
  */
 export function getComputerUseHostAdapter(): ComputerUseHostAdapter {
   if (cached) return cached
-
-  const isLinux = process.platform === 'linux'
 
   cached = {
     serverName: COMPUTER_USE_MCP_SERVER_NAME,
@@ -105,4 +105,21 @@ export function getComputerUseHostAdapter(): ComputerUseHostAdapter {
     cropRawPatch: () => null,
   }
   return cached
+}
+
+/**
+ * On Linux, use the factory for async detection of open-codex primary runtime.
+ * If open-codex is primary, swap the executor in the background.
+ */
+if (isLinux) {
+  createExecutorAdapter()
+    .then(adapter => {
+      if (adapter.isPrimary) {
+        cached!.executor = adapter.executor
+        logForDebugging('[host-adapter] Switched to open-codex executor')
+      }
+    })
+    .catch(err => {
+      logForDebugging('[host-adapter] executorFactory error:', err)
+    })
 }
