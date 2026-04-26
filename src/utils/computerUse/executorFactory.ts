@@ -9,6 +9,7 @@
 import type { ComputerExecutor } from '../../../deps/@ant/computer-use-mcp/src/types.js'
 
 import { logForDebugging } from '../debug.js'
+import { getChicagoSubGates } from './gates.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -251,8 +252,8 @@ export async function createExecutorAdapter(): Promise<ExecutorAdapter> {
 
     cachedAdapter = {
       executor: createLinuxExecutor({
-        getMouseAnimationEnabled: () => true,
-        getHideBeforeActionEnabled: () => false,
+        getMouseAnimationEnabled: () => getChicagoSubGates().mouseAnimation,
+        getHideBeforeActionEnabled: () => getChicagoSubGates().hideBeforeAction,
       }),
       isPrimary: false,
       runtimeName: 'linux-input',
