@@ -96,6 +96,8 @@ import {
 import { recursivelySanitizeUnicode } from '../../utils/sanitization.js'
 import { getSessionIngressAuthToken } from '../../utils/sessionIngressAuth.js'
 import { subprocessEnv } from '../../utils/subprocessEnv.js'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   isPersistError,
   persistToolResult,
@@ -782,6 +784,21 @@ export const connectToServer = memoize(
           })
         }
         transport = new WebSocketTransport(wsClient)
+      } else if (serverRef.type === 'code-graph') {
+        // Spawn the built-in MCP server as a stdio process
+        const serverPath = resolve(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../entrypoints/mcp.js',
+        )
+        const serverProcess = Bun.spawn(['bun', serverPath, 'mcp', 'serve'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+
+        transport = new StdioClientTransport({
+          stdin: serverProcess.stdin,
+          stdout: serverProcess.stdout,
+          stderr: serverProcess.stderr,
+        })
       } else if (serverRef.type === 'http') {
         logMCPDebug(name, `Initializing HTTP transport to ${serverRef.url}`)
         logMCPDebug(
