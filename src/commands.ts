@@ -118,6 +118,9 @@ const forkCmd = feature('FORK_SUBAGENT')
 const buddy = (
   require('./commands/buddy/index.js') as typeof import('./commands/buddy/index.js')
 ).default
+const hatch = (
+  require('./commands/hatch/index.js') as typeof import('./commands/hatch/index.js')
+).default
 /* eslint-enable @typescript-eslint/no-require-imports */
 import thinkback from './commands/thinkback/index.js'
 import thinkbackPlay from './commands/thinkback-play/index.js'
@@ -318,6 +321,7 @@ const COMMANDS = memoize((): Command[] => [
   ...(webCmd ? [webCmd] : []),
   ...(forkCmd ? [forkCmd] : []),
   ...(buddy ? [buddy] : []),
+  ...(hatch ? [hatch] : []),
   ...(proactive ? [proactive] : []),
   ...(briefCommand ? [briefCommand] : []),
   ...(assistantCommand ? [assistantCommand] : []),
