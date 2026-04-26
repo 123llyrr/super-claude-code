@@ -786,13 +786,18 @@ export const connectToServer = memoize(
         transport = new WebSocketTransport(wsClient)
       } else if (serverRef.type === 'code-graph') {
         // Spawn the built-in MCP server as a stdio process
-        const serverPath = resolve(
+        // Use the CLI entry point with mcp serve subcommand
+        const cliPath = resolve(
           dirname(fileURLToPath(import.meta.url)),
-          '../../entrypoints/mcp.ts',
+          '../../entrypoints/cli.tsx',
         )
-        const serverProcess = Bun.spawn(['bun', serverPath, 'mcp', 'serve'], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-        })
+        const serverProcess = Bun.spawn(
+          ['bun', '--env-file=.env', '--preload=./preload.ts', cliPath, 'mcp', 'serve'],
+          {
+            cwd: process.cwd(),
+            stdio: ['pipe', 'pipe', 'pipe'],
+          },
+        )
 
         transport = new StdioClientTransport({
           stdin: serverProcess.stdin,
