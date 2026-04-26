@@ -788,7 +788,7 @@ export const connectToServer = memoize(
         // Spawn the built-in MCP server as a stdio process
         const serverPath = resolve(
           dirname(fileURLToPath(import.meta.url)),
-          '../../entrypoints/mcp.js',
+          '../../entrypoints/mcp.ts',
         )
         const serverProcess = Bun.spawn(['bun', serverPath, 'mcp', 'serve'], {
           stdio: ['pipe', 'pipe', 'pipe'],
