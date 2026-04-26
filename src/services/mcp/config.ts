@@ -1169,6 +1169,12 @@ export async function getClaudeCodeMcpConfigs(
     }
   }
 
+  // Add built-in code-graph server if not disabled
+  const isCodeGraphDisabled = isMcpServerDisabled('code-graph')
+  if (!mcpLocked && !isCodeGraphDisabled) {
+    pluginMcpServers['code-graph'] = { type: 'code-graph' } as unknown as ScopedMcpServerConfig
+  }
+
   // Dedup plugin servers against manually-configured ones (and each other).
   // Plugin server keys are namespaced `plugin:x:y` so they never collide with
   // manual keys in the merge below — this content-based filter catches the case
