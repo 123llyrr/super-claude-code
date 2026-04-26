@@ -100,18 +100,15 @@ function createOpenCodexExecutor(openCodex: InstanceType<typeof import('./openCo
     // ── Display ──────────────────────────────────────────────────────
 
     async getDisplaySize(): Promise<{ displayId: number; width: number; height: number; scaleFactor: number; originX: number; originY: number }> {
-      // TODO: open-codex may not expose display geometry directly
-      // Use screenshot dimensions as fallback
-      return { displayId: 0, width: 1920, height: 1080, scaleFactor: 1, originX: 0, originY: 0 }
+      throw new Error('[open-codex] getDisplaySize not implemented — display geometry not exposed by open-codex')
     },
 
     async listDisplays(): Promise<Array<{ displayId: number; width: number; height: number; scaleFactor: number; originX: number; originY: number }>> {
-      return [await this.getDisplaySize()]
+      throw new Error('[open-codex] listDisplays not implemented')
     },
 
     async findWindowDisplays(): Promise<Array<{ bundleId: string; displayIds: number[] }>> {
-      // TODO: Implement via open-codex window tracking
-      return []
+      throw new Error('[open-codex] findWindowDisplays not implemented')
     },
 
     async prepareForAction(): Promise<string[]> {
@@ -124,37 +121,15 @@ function createOpenCodexExecutor(openCodex: InstanceType<typeof import('./openCo
     },
 
     async resolvePrepareCapture(): Promise<{ base64: string; width: number; height: number; displayWidth: number; displayHeight: number; originX: number; originY: number; displayId: number; hidden: string[] }> {
-      // TODO: Implement via open-codex screenshot + prepare
-      return {
-        base64: '',
-        width: 1920,
-        height: 1080,
-        displayWidth: 1920,
-        displayHeight: 1080,
-        originX: 0,
-        originY: 0,
-        displayId: 0,
-        hidden: [],
-      }
+      throw new Error('[open-codex] resolvePrepareCapture not implemented')
     },
 
     async screenshot(): Promise<{ base64: string; width: number; height: number; displayWidth: number; displayHeight: number; originX: number; originY: number; displayId?: number }> {
-      // TODO: open-codex screenshot integration
-      return {
-        base64: '',
-        width: 1920,
-        height: 1080,
-        displayWidth: 1920,
-        displayHeight: 1080,
-        originX: 0,
-        originY: 0,
-        displayId: 0,
-      }
+      throw new Error('[open-codex] screenshot not implemented via open-codex yet, use fallback')
     },
 
     async zoom(): Promise<{ base64: string; width: number; height: number }> {
-      // TODO: Implement via open-codex region capture
-      return { base64: '', width: 0, height: 0 }
+      throw new Error('[open-codex] zoom not implemented via open-codex yet, use fallback')
     },
 
     // ── Keyboard ─────────────────────────────────────────────────────
@@ -164,31 +139,28 @@ function createOpenCodexExecutor(openCodex: InstanceType<typeof import('./openCo
     },
 
     async holdKey(): Promise<void> {
-      // TODO: Implement via open-codex key hold
-      logForDebugging('[open-codex] holdKey not yet implemented')
+      throw new Error('[open-codex] holdKey not implemented')
     },
 
-    async type(text: string, _opts: { viaClipboard: boolean }): Promise<void> {
-      // TODO: open-codex type_text integration (clipboard param ignored for now)
+    async type(text: string, opts: { viaClipboard: boolean }): Promise<void> {
+      if (opts.viaClipboard) {
+        throw new Error('[open-codex] type with viaClipboard not implemented — use fallback executor')
+      }
       await openCodex.typeText(text)
     },
 
     async readClipboard(): Promise<string> {
-      // TODO: open-codex clipboard read
-      logForDebugging('[open-codex] readClipboard not yet implemented')
-      return ''
+      throw new Error('[open-codex] readClipboard not implemented')
     },
 
-    async writeClipboard(text: string): Promise<void> {
-      // TODO: open-codex clipboard write
-      logForDebugging('[open-codex] writeClipboard not yet implemented')
+    async writeClipboard(_text: string): Promise<void> {
+      throw new Error('[open-codex] writeClipboard not implemented')
     },
 
     // ── Mouse ────────────────────────────────────────────────────────
 
     async moveMouse(x: number, y: number): Promise<void> {
-      // TODO: open-codex move_mouse integration
-      logForDebugging(`[open-codex] moveMouse(${x}, ${y}) not yet implemented`)
+      throw new Error(`[open-codex] moveMouse(${x}, ${y}) not implemented`)
     },
 
     async click(
@@ -198,67 +170,53 @@ function createOpenCodexExecutor(openCodex: InstanceType<typeof import('./openCo
       count: 1 | 2 | 3,
       _modifiers?: string[],
     ): Promise<void> {
-      // TODO: open-codex click with element index (coordinate click as fallback)
-      logForDebugging(`[open-codex] click(${x}, ${y}, ${button}, ${count}) not yet implemented`)
+      throw new Error(`[open-codex] click(${x}, ${y}, ${button}, ${count}) not implemented`)
     },
 
     async mouseDown(): Promise<void> {
-      logForDebugging('[open-codex] mouseDown not yet implemented')
+      throw new Error('[open-codex] mouseDown not implemented')
     },
 
     async mouseUp(): Promise<void> {
-      logForDebugging('[open-codex] mouseUp not yet implemented')
+      throw new Error('[open-codex] mouseUp not implemented')
     },
 
     async getCursorPosition(): Promise<{ x: number; y: number }> {
-      // TODO: open-codex cursor position
-      return { x: 0, y: 0 }
+      throw new Error('[open-codex] getCursorPosition not implemented')
     },
 
     async drag(): Promise<void> {
-      // TODO: open-codex drag integration
-      logForDebugging('[open-codex] drag not yet implemented')
+      throw new Error('[open-codex] drag not implemented')
     },
 
-    async scroll(x: number, y: number, dx: number, dy: number): Promise<void> {
-      // TODO: open-codex scroll integration (Page_Up/Down keys as fallback)
-      logForDebugging(`[open-codex] scroll(${x}, ${y}, ${dx}, ${dy}) not yet implemented`)
+    async scroll(_x: number, _y: number, _dx: number, _dy: number): Promise<void> {
+      throw new Error('[open-codex] scroll not implemented')
     },
 
     // ── App management ───────────────────────────────────────────────
 
     async getFrontmostApp(): Promise<{ bundleId: string; displayName: string } | null> {
-      // TODO: open-codex frontmost app detection
-      logForDebugging('[open-codex] getFrontmostApp not yet implemented')
-      return null
+      throw new Error('[open-codex] getFrontmostApp not implemented')
     },
 
     async appUnderPoint(): Promise<{ bundleId: string; displayName: string } | null> {
-      // TODO: open-codex app under point
-      logForDebugging('[open-codex] appUnderPoint not yet implemented')
-      return null
+      throw new Error('[open-codex] appUnderPoint not implemented')
     },
 
     async listInstalledApps(): Promise<Array<{ bundleId: string; displayName: string; path: string; iconDataUrl?: string }>> {
-      // TODO: open-codex list_apps integration
-      logForDebugging('[open-codex] listInstalledApps not yet implemented')
-      return []
+      throw new Error('[open-codex] listInstalledApps not implemented')
     },
 
     async getAppIcon(): Promise<string | undefined> {
-      // TODO: open-codex icon lookup
-      return undefined
+      throw new Error('[open-codex] getAppIcon not implemented')
     },
 
     async listRunningApps(): Promise<Array<{ bundleId: string; displayName: string; pid?: number }>> {
-      // TODO: open-codex list running apps
-      logForDebugging('[open-codex] listRunningApps not yet implemented')
-      return []
+      throw new Error('[open-codex] listRunningApps not implemented')
     },
 
     async openApp(bundleId: string): Promise<void> {
-      // TODO: open-codex open_app integration
-      logForDebugging(`[open-codex] openApp(${bundleId}) not yet implemented`)
+      throw new Error(`[open-codex] openApp(${bundleId}) not implemented`)
     },
   }
 }
