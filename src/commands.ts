@@ -122,6 +122,7 @@ const hatch = (
   require('./commands/hatch/index.js') as typeof import('./commands/hatch/index.js')
 ).default
 /* eslint-enable @typescript-eslint/no-require-imports */
+import { searchToolsCommand } from './services/tool-search/commands/index.js'
 import thinkback from './commands/thinkback/index.js'
 import thinkbackPlay from './commands/thinkback-play/index.js'
 import permissions from './commands/permissions/index.js'
@@ -298,6 +299,7 @@ const COMMANDS = memoize((): Command[] => [
   rename,
   resume,
   session,
+  searchToolsCommand,
   skills,
   stats,
   status,

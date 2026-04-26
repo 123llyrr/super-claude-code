@@ -1,1 +1,1 @@
-// Placeholder - will be filled in Task 6
+export { searchToolsCommand } from './SearchToolsCommand.js'
