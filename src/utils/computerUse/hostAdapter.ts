@@ -104,14 +104,25 @@ export function getComputerUseHostAdapter(): ComputerUseHostAdapter {
     // The sub-gate defaults to false anyway.
     cropRawPatch: () => null,
   }
+
+  // Start async detection for future callers (after first caller's adapter is returned)
+  startBackgroundExecutorSwap()
+
   return cached
 }
 
+// Background detection flag — ensure swap only affects subsequent callers, not the first
+let backgroundDetectionStarted = false
+
 /**
  * On Linux, use the factory for async detection of open-codex primary runtime.
- * If open-codex is primary, swap the executor in the background.
+ * If open-codex is primary, swap the executor in the background for FUTURE callers.
+ * First caller always gets the initial adapter (linux-input fallback) to avoid race.
  */
-if (isLinux) {
+function startBackgroundExecutorSwap() {
+  if (!isLinux || backgroundDetectionStarted) return
+  backgroundDetectionStarted = true
+
   createExecutorAdapter()
     .then(adapter => {
       if (adapter.isPrimary) {
