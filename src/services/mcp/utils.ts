@@ -260,7 +260,7 @@ export function isMcpCommand(command: Command): boolean {
  * @param scope The config scope ('user', 'project', 'local', or 'dynamic')
  * @returns A description of where the config is stored
  */
-export function describeMcpConfigFilePath(scope: ConfigScope): string {
+export function describeMcpConfigFilePath(scope: ConfigScope): string | null {
   switch (scope) {
     case 'user':
       return getGlobalClaudeFile()
@@ -275,7 +275,8 @@ export function describeMcpConfigFilePath(scope: ConfigScope): string {
     case 'claudeai':
       return 'claude.ai'
     default:
-      return scope
+      // Built-in servers (like code-graph) have no config file path
+      return null
   }
 }
 
